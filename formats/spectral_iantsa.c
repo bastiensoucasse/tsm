@@ -14,6 +14,7 @@
 
 /* taille de la fenetre */
 #define	FRAME_SIZE 1024
+#define FFT_SIZE 1024 //44100
 /* avancement */
 #define HOP_SIZE 1024
 
@@ -102,9 +103,9 @@ dft (double s[FRAME_SIZE], double complex S[FRAME_SIZE])
 
 // FFT
 static void
-cartesian_to_polar (double complex S[FRAME_SIZE], double amp[FRAME_SIZE], double phs[FRAME_SIZE])
+cartesian_to_polar (double complex S[FFT_SIZE], double amp[FFT_SIZE], double phs[FFT_SIZE])
 {
-	for (int n = 0; n < FRAME_SIZE; n++)
+	for (int n = 0; n < FFT_SIZE; n++)
 	{
 		amp[n] = cabs(S[n]);
 		phs[n] = carg(S[n]);
@@ -112,15 +113,15 @@ cartesian_to_polar (double complex S[FRAME_SIZE], double amp[FRAME_SIZE], double
 }
 
 static void
-fft_init(fftw_complex data_in[FRAME_SIZE], fftw_complex data_out[FRAME_SIZE])
+fft_init(fftw_complex data_in[FFT_SIZE], fftw_complex data_out[FFT_SIZE])
 {
-	plan = fftw_plan_dft_1d(FRAME_SIZE, data_in, data_out, FFTW_FORWARD, FFTW_ESTIMATE);
+	plan = fftw_plan_dft_1d(FFT_SIZE, data_in, data_out, FFTW_FORWARD, FFTW_ESTIMATE);
 }
 
 static void
-fft(double s[FRAME_SIZE], fftw_complex data_in[FRAME_SIZE])
+fft(double s[FFT_SIZE], fftw_complex data_in[FFT_SIZE])
 {
-	for (int i = 0; i < FRAME_SIZE; i++)
+	for (int i = 0; i < FFT_SIZE; i++)
 		data_in[i] = s[i];
 
 	fftw_execute(plan);
@@ -130,6 +131,12 @@ static void
 fft_exit()
 {
 	fftw_destroy_plan(plan);
+}
+
+static double
+hann(double n)
+{
+	return 0.5 - 0.5*cos(2*M_PI*n / FRAME_SIZE);
 }
 
 // IFFT
@@ -215,7 +222,8 @@ main (int argc, char * argv [])
 	double complex S[FRAME_SIZE];
 
 	// FFT
-	fftw_complex data_in[FRAME_SIZE], data_out[FRAME_SIZE];
+	double fft_buffer[FFT_SIZE];
+	fftw_complex data_in[FFT_SIZE], data_out[FFT_SIZE];
 	fft_init(data_in, data_out);
 
     // DFT vs FFT
@@ -228,7 +236,7 @@ main (int argc, char * argv [])
 	ifft_init(idata_in, idata_out);
 	double sound[FRAME_SIZE];
 	  	
-    double amp[FRAME_SIZE], phs[FRAME_SIZE];
+    double amp[FFT_SIZE], phs[FFT_SIZE];
 	while (read_samples (infile, new_buffer, sfinfo.channels)==1)
 	  {
 	    /* Process Samples */
@@ -237,6 +245,8 @@ main (int argc, char * argv [])
 	    /* hop size */
 	    fill_buffer(buffer, new_buffer);
 
+		for (int i = 0; i < FFT_SIZE; i++)
+			fft_buffer[i] = i < FRAME_SIZE ? buffer[i]*hann(i) : 0.;
 
 	    // DFT
         // t1 = clock();
@@ -249,30 +259,49 @@ main (int argc, char * argv [])
 
 		// FFT
         // t1 = clock();
-		fft(buffer, data_in);
+		fft(fft_buffer, data_in);
         // t2 = clock();
         // delta_t = t2 - t1;
         // delta_t_sum += delta_t;
         // printf ("FFT: %f secondes\n", delta_t / CLOCKS_PER_SEC);
 		cartesian_to_polar(data_out, amp, phs);
 
+		// Normalize
+		double max_amp = amp[0]; 
+		int max_freq = 0;
+		for (int i = 1; i < FFT_SIZE/2; i++)
+		{
+			if (max_amp < amp[i])
+			{
+				max_amp = amp[i];
+				max_freq = i;
+			}
+		}
+		printf("Max amplitude: %lf, Max frequence: %d\n", max_amp, max_freq);
+		printf("Amplitude normalization: %lf\n", max_amp * 2 / FRAME_SIZE);
+		printf("Hertz correspondance: %lf ± %lf Hz\n", max_freq * 44100. / FFT_SIZE, 44100. / (2*FFT_SIZE)); // cross product
+
+		for (int i = 0; i < FFT_SIZE; i++)
+			//amp[i] /= max_amp;
+			amp[i] = amp[i] * 2. / FRAME_SIZE;
+
 	    /* PLOT */
-	    // gnuplot_resetplot(h);
-	    // gnuplot_plot_x(h,amp,FRAME_SIZE/2,"temporal frame");
-	    // sleep(1);
+	    gnuplot_resetplot(h);
+	    gnuplot_plot_x(h,amp,FRAME_SIZE/2,"temporal frame");
+	    sleep(1);
 
 		// IFFT
-		polar_to_cartesian(amp, phs, idata_in);
-		ifft(idata_out, sound);
+		// polar_to_cartesian(amp, phs, idata_in);
+		// ifft(idata_out, sound);
     
 	    nb_frames++;
 	  }
 
-      printf ("FFT average: %f secondes\n", delta_t_sum / CLOCKS_PER_SEC);
+      // printf ("FFT average: %f secondes\n", delta_t_sum / CLOCKS_PER_SEC);
 
 	sf_close (infile) ;
 	fft_exit();
-	ifft_exit();
+	// ifft_exit();
 
 	return 0 ;
 } /* main */
