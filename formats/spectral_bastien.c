@@ -11,7 +11,7 @@
 #include <time.h>
 
 #define SAMPLING_FREQ 44100.
-#define FFT_SIZE 44100
+#define FFT_SIZE 1024
 #define FRAME_SIZE 1024
 #define HOP_SIZE 1024
 
@@ -215,7 +215,7 @@ int main(int argc, char** argv)
     while (read_samples(infile, new_buffer, sfinfo.channels) == 1) {
         printf("\nProcessing frame %d…\n", nb_frames);
         fill_buffer(buffer, new_buffer);
-        
+
         for (unsigned int i = 0; i < FFT_SIZE; i++)
             s[i] = i < FRAME_SIZE ? buffer[i] * hann(i) : 0.;
 
@@ -239,7 +239,7 @@ int main(int argc, char** argv)
 
         for (unsigned int i = 0; i < FFT_SIZE; i++)
             amp[i] *= 2. / FRAME_SIZE;
-                
+
         double max_amp = amp[0];
         unsigned int max_amp_sample;
         for (unsigned int i = 1; i < FFT_SIZE / 2; i++)
@@ -251,10 +251,21 @@ int main(int argc, char** argv)
 
         printf("Max amp: %lf, max amp freq: %lf (±%lf).\n", max_amp, max_amp_freq, SAMPLING_FREQ / (2 * FFT_SIZE));
 
+        printf("Parabolic Interpolation…\n");
+        const int m = max_amp_sample;
+        const double al = 20 * log10(amp[m - 1]);
+        const double ac = 20 * log10(amp[m]);
+        const double ar = 20 * log10(amp[m + 1]);
+        const double d = .5 * (al - ar) / (al - 2 * ac + ar);
+        const double m_hat = m + d;
+        const double f_hat = m_hat * SAMPLING_FREQ / FFT_SIZE;
+        const double a_hat = ac - (al - ar) * d / 4;
+        printf("Max amp: %lf, max amp freq: %lf.\n", a_hat, f_hat);
+
         // Plot
-        gnuplot_resetplot(h);
-        gnuplot_plot_x(h, amp, FRAME_SIZE / 2, "temporal frame");
-        sleep(1);
+        // gnuplot_resetplot(h);
+        // gnuplot_plot_x(h, amp, FRAME_SIZE / 2, "temporal frame");
+        // sleep(1);
 
         // IFFT
         // polar_to_cartesian(amp, phs, idata_in);

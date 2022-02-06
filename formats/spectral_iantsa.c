@@ -240,7 +240,7 @@ main (int argc, char * argv [])
 	while (read_samples (infile, new_buffer, sfinfo.channels)==1)
 	  {
 	    /* Process Samples */
-	    printf("Processing frame %d\n",nb_frames);
+	    printf("\nProcessing frame %d\n",nb_frames);
 
 	    /* hop size */
 	    fill_buffer(buffer, new_buffer);
@@ -279,16 +279,29 @@ main (int argc, char * argv [])
 		}
 		printf("Max amplitude: %lf, Max frequence: %d\n", max_amp, max_freq);
 		printf("Amplitude normalization: %lf\n", max_amp * 2 / FRAME_SIZE);
-		printf("Hertz correspondance: %lf ± %lf Hz\n", max_freq * 44100. / FFT_SIZE, 44100. / (2*FFT_SIZE)); // cross product
+		double freqHz = max_freq * 44100. / FFT_SIZE; // cross product
+		printf("Hertz correspondance: %lf ± %lf Hz\n", freqHz, 44100. / (2*FFT_SIZE)); 
 
 		for (int i = 0; i < FFT_SIZE; i++)
 			//amp[i] /= max_amp;
 			amp[i] = amp[i] * 2. / FRAME_SIZE;
 
+		// Parabolic interpolation
+		double al = 20 * log(amp[max_freq-1]);
+		double ac = 20 * log(amp[max_freq]);
+		double ar = 20 * log(amp[max_freq+1]);
+		double d = 0.5 * (al - ar) / (al - 2*ac + ar);
+		printf("d = %lf\n", d);
+		printf("new m = %lf\n", max_freq + d);
+		double freqEst = (max_freq + d) * 44100. / FFT_SIZE;
+		// double ampEst = ac - (al-ar)*d*0.25;
+		printf("Peak frequence estimation: %lf Hz\n", freqEst); 
+		// printf("Peak amplitude estimation: %lf dB\n", ampEst); 
+
 	    /* PLOT */
-	    gnuplot_resetplot(h);
-	    gnuplot_plot_x(h,amp,FRAME_SIZE/2,"temporal frame");
-	    sleep(1);
+	    // gnuplot_resetplot(h);
+	    // gnuplot_plot_x(h,amp,FRAME_SIZE/2,"temporal frame");
+	    // sleep(1);
 
 		// IFFT
 		// polar_to_cartesian(amp, phs, idata_in);
