@@ -23,7 +23,7 @@ static fftw_plan plan;
 static fftw_plan iplan;
 
 static void
-print_usage (char *progname)
+usage (char *progname)
 {	printf ("\nUsage : %s <input file> \n", progname) ;
 	puts ("\n"
 		) ;
@@ -180,7 +180,7 @@ main (int argc, char * argv [])
 	progname = progname ? progname + 1 : argv [0] ;
 
 	if (argc != 2)
-	{	print_usage (progname) ;
+	{	usage (progname) ;
 		return 1 ;
 		} ;
 

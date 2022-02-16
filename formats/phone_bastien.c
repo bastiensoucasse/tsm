@@ -1,4 +1,3 @@
-#include "gnuplot_i.h"
 #include <complex.h>
 #include <ctype.h>
 #include <fftw3.h>
@@ -10,6 +9,8 @@
 #include <string.h>
 #include <time.h>
 
+#include "gnuplot_i.h"
+
 #define SAMPLING_FREQ 44100.
 #define FFT_SIZE 1024
 #define FRAME_SIZE 1024
@@ -17,11 +18,10 @@
 
 static gnuplot_ctrl* h;
 static fftw_plan plan;
-// static fftw_plan iplan;
 
 static void usage(char* progname)
 {
-    printf("\nUsage : %s <input file> \n", progname);
+    printf("\nUsage: %s <input file> \n", progname);
     puts("\n");
 }
 
@@ -108,48 +108,6 @@ cartesian_to_polar(const double complex S[FFT_SIZE], double amp[FFT_SIZE], doubl
     }
 }
 
-/* IFFT */
-
-// static void
-// polar_to_cartesian(const double amp[FFT_SIZE], const double phs[FFT_SIZE], double complex S[FFT_SIZE])
-// {
-//     for (unsigned int m = 0; m < FFT_SIZE; m++)
-//         S[m] = amp[m] * cos(phs[m]) + amp[m] * sin(phs[m]) * I;
-// }
-
-// static void
-// ifft_init(fftw_complex data_in[FFT_SIZE], fftw_complex data_out[FFT_SIZE])
-// {
-//     iplan = fftw_plan_dft_1d(FFT_SIZE, data_in, data_out, FFTW_BACKWARD, FFTW_ESTIMATE);
-// }
-
-// static void
-// ifft(const fftw_complex data_out[FFT_SIZE], double s[FFT_SIZE])
-// {
-//     fftw_execute(iplan);
-
-//     for (unsigned int i = 0; i < FFT_SIZE; i++)
-//         s[i] = data_out[i] / FFT_SIZE;
-// }
-
-// static void
-// ifft_exit()
-// {
-//     fftw_destroy_plan(iplan);
-// }
-
-/* MAIN */
-
-// static void
-// print_frame(const double frame[FRAME_SIZE], const unsigned short num_samples, const char* name)
-// {
-//     printf("%s:", name);
-//     for (unsigned int i = 0; i < FRAME_SIZE; i += FRAME_SIZE / num_samples) {
-//         printf(" %lf", frame[i]);
-//     }
-//     printf(".\n");
-// }
-
 static double
 hann(unsigned int n)
 {
@@ -198,19 +156,9 @@ int main(int argc, char** argv)
     printf("Channels: %d.\n", sfinfo.channels);
     printf("Size: %d.\n", (int)sfinfo.frames);
 
-    // For the DFT
-    // double complex S[FRAME_SIZE];
-    // clock_t dft_single_duration, dft_full_duration = 0;
-
-    // For the FFT & IFFT
     double s[FFT_SIZE], amp[FFT_SIZE], phs[FFT_SIZE];
     fftw_complex data_in[FFT_SIZE], data_out[FFT_SIZE];
     fft_init(data_in, data_out);
-    // double output[FRAME_SIZE];
-    // fftw_complex idata_in[FRAME_SIZE], idata_out[FRAME_SIZE];
-    // ifft_init(idata_in, idata_out);
-    // clock_t fft_single_duration, fft_full_duration = 0;
-    // clock_t ifft_single_duration, ifft_full_duration = 0;
 
     while (read_samples(infile, new_buffer, sfinfo.channels) == 1) {
         printf("\nProcessing frame %d…\n", nb_frames);
@@ -219,22 +167,7 @@ int main(int argc, char** argv)
         for (unsigned int i = 0; i < FFT_SIZE; i++)
             s[i] = i < FRAME_SIZE ? buffer[i] * hann(i) : 0.;
 
-        // Print input
-        // print_frame(buffer, 10, "Input");
-
-        // DFT
-        // dft_single_duration = clock();
-        // dft(buffer, S);
-        // dft_single_duration = clock() - dft_single_duration;
-        // dft_full_duration += dft_single_duration;
-        // printf("DFT Duration: %lfs.\n", (double)dft_single_duration / CLOCKS_PER_SEC);
-
-        // FFT
-        // fft_single_duration = clock();
         fft(s, data_in);
-        // fft_single_duration = clock() - fft_single_duration;
-        // fft_full_duration += fft_single_duration;
-        // printf("FFT Duration: %lfs.\n", (double)fft_single_duration / CLOCKS_PER_SEC);
         cartesian_to_polar(data_out, amp, phs);
 
         for (unsigned int i = 0; i < FFT_SIZE; i++)
@@ -262,37 +195,10 @@ int main(int argc, char** argv)
         const double a_hat = ac - (al - ar) * d / 4;
         printf("Max amp: %lf, max amp freq: %lf.\n", a_hat, f_hat);
 
-        // Plot
-        // gnuplot_resetplot(h);
-        // gnuplot_plot_x(h, amp, FRAME_SIZE / 2, "temporal frame");
-        // sleep(1);
-
-        // IFFT
-        // polar_to_cartesian(amp, phs, idata_in);
-        // ifft_single_duration = clock();
-        // ifft(idata_out, output);
-        // ifft_single_duration = clock() - ifft_single_duration;
-        // ifft_full_duration += ifft_single_duration;
-        // printf("IFFT Duration: %lfs.\n", (double)ifft_single_duration / CLOCKS_PER_SEC);
-
-        // Print output
-        // print_frame(output, 10, "Output");
-
         nb_frames++;
     }
 
-    // printf("\n");
-
-    // printf("Full DFT Duration: %lfs.\n", (double)dft_full_duration / CLOCKS_PER_SEC);
-    // printf("Full FFT Duration: %lfs.\n", (double)fft_full_duration / CLOCKS_PER_SEC);
-    // printf("Full IFFT Duration: %lfs.\n", (double)ifft_full_duration / CLOCKS_PER_SEC);
-
-    // printf("Average DFT Duration: %lfs.\n", ((double)dft_full_duration / CLOCKS_PER_SEC) / nb_frames);
-    // printf("Average FFT Duration: %lfs.\n", ((double)fft_full_duration / CLOCKS_PER_SEC) / nb_frames);
-    // printf("Average IFFT Duration: %lfs.\n", ((double)ifft_full_duration / CLOCKS_PER_SEC) / nb_frames);
-
     fft_exit();
-    // ifft_exit();
     sf_close(infile);
     return EXIT_SUCCESS;
 }
