@@ -51,7 +51,7 @@ fill_frame_buffer(double* const frame_buffer, const double* const hop_buffer)
     for (unsigned int sample = 0; sample < FRAME_SIZE - HOP_SIZE; sample++)
         tmp[sample] = frame_buffer[sample + HOP_SIZE];
 
-    for (unsigned sample = 0; sample < (FRAME_SIZE - HOP_SIZE); sample++)
+    for (unsigned sample = 0; sample < FRAME_SIZE - HOP_SIZE; sample++)
         frame_buffer[sample] = tmp[sample];
 
     for (unsigned sample = 0; sample < HOP_SIZE; sample++)

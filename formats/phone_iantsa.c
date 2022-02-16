@@ -16,11 +16,11 @@
 #define FFT_SIZE FRAME_SIZE
 
 static gnuplot_ctrl* h; // Plot graph.
-static fftw_plan plan;  // FFT plan.
+static fftw_plan plan; // FFT plan.
 
 /**
  * @brief Prints usage on the console.
- * 
+ *
  * @param progname The program name entered in command line.
  */
 static void
@@ -31,7 +31,7 @@ usage(char* progname)
 
 /**
  * @brief Fills the frame buffer from the hop buffer.
- * 
+ *
  * @param buffer The frame buffer.
  * @param new_buffer The hop buffer.
  */
@@ -44,7 +44,7 @@ fill_buffer(double* buffer, double* new_buffer)
     for (i = 0; i < FRAME_SIZE - HOP_SIZE; i++)
         tmp[i] = buffer[i + HOP_SIZE];
 
-    for (i = 0; i < (FRAME_SIZE - HOP_SIZE); i++)
+    for (i = 0; i < FRAME_SIZE - HOP_SIZE; i++)
         buffer[i] = tmp[i];
 
     for (i = 0; i < HOP_SIZE; i++)
@@ -53,7 +53,7 @@ fill_buffer(double* buffer, double* new_buffer)
 
 /**
  * @brief Reads n samples from file into the buffer.
- * 
+ *
  * @param infile The file (sound) to read.
  * @param buffer The buffer to fill.
  * @param channels The number of channels of the sound.
@@ -81,7 +81,7 @@ read_n_samples(SNDFILE* infile, double* buffer, int channels, int n)
 
 /**
  * @brief Reads HOP_SIZE samples from file into the hop buffer.
- * 
+ *
  * @param infile The file (sound) to read.
  * @param buffer The hop buffer to fill.
  * @param channels The number of channels of the sound.
@@ -206,12 +206,12 @@ int main(int argc, char** argv)
     // Retrieve file info.
     const unsigned int SAMPLE_RATE = sfinfo.samplerate; // 44100 Hz.
     const unsigned char NUM_CHANNELS = sfinfo.channels; // 1 (mono).
-    const unsigned int NUM_FRAMES = (int)sfinfo.frames; // 132300.
+    const unsigned int SIZE = (int)sfinfo.frames; // 132300.
 
     // Display file info.
-    printf("Sample rate: %d.\n", SAMPLE_RATE);
-    printf("Number of channels: %d.\n", NUM_CHANNELS);
-    printf("Number of frames: %d.\n", NUM_FRAMES);
+    printf("Sample Rate: %d.\n", SAMPLE_RATE);
+    printf("Channels: %d.\n", NUM_CHANNELS);
+    printf("Size: %d.\n", SIZE);
 
     // Initialize FFT.
     double fft_buffer[FFT_SIZE], amp[FFT_SIZE], phs[FFT_SIZE];

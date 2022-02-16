@@ -4,11 +4,11 @@
 
 ### Question 1
 
-duree d'un signal de clavier: d = 0.2 s \
-frequence d'echantillonnage: Fech = 44100 Hz
+durée d'un signal de clavier: d = 0.2 s \
+fréquence d'échantillonnage: Fech = 44100 Hz
 
 FRAME_SIZE = d * Fech = 0.2 * 44100 = 8820 \
-resolution frequentielle: **freq_prec** = Fech / FRAME_SIZE / 2 = **2.5 Hz**
+résolution fréquentielle: **freq_prec** = Fech / FRAME_SIZE / 2 = **2.5 Hz**
 
 
 

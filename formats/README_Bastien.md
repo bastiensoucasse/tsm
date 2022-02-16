@@ -1,8 +1,10 @@
 Bastien Soucasse
 
-# TD 4
+# Exemple de signal de clavier telephonique – TD 4
 
-## Question 1
+## Analyse de fréquences
+
+### Question 1
 
 Résolution temporelle :\
 `FRAME_SIZE = DURATION * SAMPLE_RATE = .2 * 44100 = 8820`.
@@ -12,10 +14,10 @@ Résolution fréquentielle :\
 
 Il n'y a pas de précautions à prendre.
 
-## Question 2
+### Question 2
 
 On observe 5 pics au total, cela signifie que certaines fréquences sont présentes plusieurs fois.
 
-## Question 3
+### Question 3
 
-
+…
