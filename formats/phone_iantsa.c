@@ -1,31 +1,40 @@
 #include <complex.h>
-#include <ctype.h>
 #include <fftw3.h>
 #include <math.h>
 #include <sndfile.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <time.h>
 
 #include "gnuplot_i.h"
 
 #define VERBOSE true
+#define PLOT false
 
 #define FRAME_SIZE 1024
 #define HOP_SIZE FRAME_SIZE
 #define FFT_SIZE FRAME_SIZE
 
-static gnuplot_ctrl* h;
-static fftw_plan plan;
+static gnuplot_ctrl* h; // Plot graph.
+static fftw_plan plan;  // FFT plan.
 
+/**
+ * @brief Prints usage on the console.
+ * 
+ * @param progname The program name entered in command line.
+ */
 static void
 usage(char* progname)
 {
     fprintf(stderr, "Usage: %s <input file>.\n", progname);
 }
 
+/**
+ * @brief Fills the frame buffer from the hop buffer.
+ * 
+ * @param buffer The frame buffer.
+ * @param new_buffer The hop buffer.
+ */
 static void
 fill_buffer(double* buffer, double* new_buffer)
 {
@@ -42,6 +51,15 @@ fill_buffer(double* buffer, double* new_buffer)
         buffer[FRAME_SIZE - HOP_SIZE + i] = new_buffer[i];
 }
 
+/**
+ * @brief Reads n samples from file into the buffer.
+ * 
+ * @param infile The file (sound) to read.
+ * @param buffer The buffer to fill.
+ * @param channels The number of channels of the sound.
+ * @param n The number of samples to read into buffer.
+ * @return True if the program read n samples successfully; false otherwise.
+ */
 static int
 read_n_samples(SNDFILE* infile, double* buffer, int channels, int n)
 {
@@ -61,6 +79,14 @@ read_n_samples(SNDFILE* infile, double* buffer, int channels, int n)
     return 0;
 }
 
+/**
+ * @brief Reads HOP_SIZE samples from file into the hop buffer.
+ * 
+ * @param infile The file (sound) to read.
+ * @param buffer The hop buffer to fill.
+ * @param channels The number of channels of the sound.
+ * @return True if the program read HOP_SIZE samples successfully; false otherwise.
+ */
 static int
 read_samples(SNDFILE* infile, double* buffer, int channels)
 {
@@ -120,11 +146,10 @@ fft_exit()
 }
 
 /**
- * @brief HANN
- * TODO: Function Documentation.
+ * @brief Converts a signal value into Hann window.
  *
- * @param n
- * @return double
+ * @param n The value to convert.
+ * @return The converted value.
  */
 static double
 hann(double n)
@@ -134,33 +159,41 @@ hann(double n)
 
 int main(int argc, char** argv)
 {
+    // Init file accessing.
     char *progname, *infilename;
     SNDFILE* infile = NULL;
     SF_INFO sfinfo;
 
+    // Retrieve program name.
     progname = strrchr(argv[0], '/');
     progname = progname ? progname + 1 : argv[0];
 
+    // Check correct usage.
     if (argc != 2) {
         usage(progname);
         return 1;
     }
 
+    // Retrieve input file name.
     infilename = argv[1];
 
+    // Open input file.
     if ((infile = sf_open(infilename, SFM_READ, &sfinfo)) == NULL) {
         fprintf(stderr, "Not able to open input file %s.\n", infilename);
         puts(sf_strerror(NULL));
         return EXIT_FAILURE;
     }
 
+    // Init file reading.
     int nb_frames = 0;
     double new_buffer[HOP_SIZE];
     double buffer[FRAME_SIZE];
 
+    // Init ploting.
     h = gnuplot_init();
     gnuplot_setstyle(h, "lines");
 
+    // Check wether FRAME_SIZE & HOP_FILE are correct for file.
     for (int i = 0; i < FRAME_SIZE / HOP_SIZE - 1; i++) {
         if (read_samples(infile, new_buffer, sfinfo.channels) == 1)
             fill_buffer(buffer, new_buffer);
@@ -238,6 +271,13 @@ int main(int argc, char** argv)
         double delta = .5 * (al - ar) / (al - 2 * ac + ar);
         double peak_freq = (max_amp_i + delta) * SAMPLE_RATE / FFT_SIZE;
         printf("Estimated peak frequency: %lf Hz.\n", peak_freq);
+
+        // Display the frame.
+        if (PLOT) {
+            gnuplot_resetplot(h);
+            gnuplot_plot_x(h, amp, FRAME_SIZE / 2, "temporal frame");
+            sleep(1);
+        }
 
         // Increase frame id for next frame.
         nb_frames++;
