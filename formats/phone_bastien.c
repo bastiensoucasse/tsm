@@ -8,11 +8,10 @@
 
 #include "gnuplot_i.h"
 
-#define VERBOSE true
 #define PLOT false
 
-#define FRAME_SIZE 1024
-#define HOP_SIZE FRAME_SIZE
+#define FRAME_SIZE 158760
+#define HOP_SIZE 4410
 
 static gnuplot_ctrl* gnuplot;
 static fftw_plan fft_plan;
@@ -59,13 +58,6 @@ fill_frame_buffer(double* const frame_buffer, const double* const hop_buffer)
 }
 
 static void
-hann(double* const signal)
-{
-    for (unsigned int sample = 0; sample < FRAME_SIZE; sample++)
-        signal[sample] = .5 - .5 * cos(2 * M_PI * signal[sample] / FRAME_SIZE);
-}
-
-static void
 fft_init(fftw_complex* const fft_in, fftw_complex* const fft_out)
 {
     fft_plan = fftw_plan_dft_1d(FRAME_SIZE, fft_in, fft_out, FFTW_FORWARD, FFTW_ESTIMATE);
@@ -81,10 +73,10 @@ fft(fftw_complex* const fft_in, const double* const signal)
 }
 
 static void
-cartesian_to_polar(double* const amplitudes, double* const phases, const double complex* const complex_signal)
+cartesian_to_polar(double* const amplitudes, double* const phases, const double complex* const fft_out)
 {
     for (unsigned int sample = 0; sample < FRAME_SIZE; sample++)
-        amplitudes[sample] = cabs(complex_signal[sample]), phases[sample] = carg(complex_signal[sample]);
+        amplitudes[sample] = cabs(fft_out[sample]), phases[sample] = carg(fft_out[sample]);
 }
 
 static void
@@ -110,13 +102,13 @@ int main(const int argc, const char* const* const argv)
         return EXIT_FAILURE;
     }
 
-    const unsigned int sample_rate = input_info.samplerate;
+    const double sample_rate = input_info.samplerate;
     const unsigned char channels = input_info.channels;
-    const unsigned int frames = input_info.frames;
+    const unsigned int size = input_info.frames;
 
-    printf("Sample rate: %d.\n", sample_rate);
-    printf("Number of channels: %d.\n", channels);
-    printf("Number of frames: %d.\n", frames);
+    printf("Sample Rate: %.2lf Hz.\n", sample_rate);
+    printf("Channels: %d.\n", channels);
+    printf("Size: %d samples.\n", size);
 
     int frame_id = 0;
     double hop_buffer[HOP_SIZE];
@@ -138,16 +130,15 @@ int main(const int argc, const char* const* const argv)
     double amplitudes[FRAME_SIZE], phases[FRAME_SIZE];
     fft_init(fft_in, fft_out);
 
+    const double fft_frequency_precision = sample_rate / (2. * FRAME_SIZE);
+    printf("FFT Frequency Precision: %.2lf Hz.\n", fft_frequency_precision);
+
     while (read_samples(hop_buffer, input_file, channels)) {
         printf("\nProcessing frame %d…\n", frame_id);
         fill_frame_buffer(frame_buffer, hop_buffer);
-        hann(frame_buffer);
 
         fft(fft_in, frame_buffer);
         cartesian_to_polar(amplitudes, phases, fft_out);
-
-        for (unsigned int sample = 0; sample < FRAME_SIZE; sample++)
-            amplitudes[sample] *= 2. / FRAME_SIZE;
 
         double maximum_amplitude = amplitudes[0];
         int maximum_amplitude_sample = 0;
@@ -164,13 +155,8 @@ int main(const int argc, const char* const* const argv)
             continue;
         }
 
-        if (VERBOSE)
-            printf("Max amplitude: %.2lf.\n", maximum_amplitude);
-
-        const double frequency_precision = sample_rate / FRAME_SIZE / 2.;
-
         const double maximum_amplitude_frequency = maximum_amplitude_sample * sample_rate / FRAME_SIZE;
-        printf("Max amplitude frequency: %.2lf (± %.2lf) Hz.\n", maximum_amplitude_frequency, frequency_precision);
+        printf("Max amplitude frequency: %.2lf (± %.2lf) Hz.\n", maximum_amplitude_frequency, fft_frequency_precision);
 
         const double left = 20 * log(amplitudes[maximum_amplitude_sample - 1]);
         const double current = 20 * log(amplitudes[maximum_amplitude_sample]);
@@ -181,7 +167,7 @@ int main(const int argc, const char* const* const argv)
 
         if (PLOT) {
             gnuplot_resetplot(gnuplot);
-            gnuplot_plot_x(gnuplot, amplitudes, FRAME_SIZE / 2, "Temporal Frame");
+            gnuplot_plot_x(gnuplot, amplitudes, FRAME_SIZE / 10, "Spectral Frame");
             sleep(1);
         }
 

@@ -11,8 +11,8 @@
 #define VERBOSE true
 #define PLOT false
 
-#define FRAME_SIZE 1024
-#define HOP_SIZE FRAME_SIZE
+#define FRAME_SIZE 158760
+#define HOP_SIZE 1024
 #define FFT_SIZE FRAME_SIZE
 
 static gnuplot_ctrl* h; // Plot graph.
@@ -145,17 +145,17 @@ fft_exit()
     fftw_destroy_plan(plan);
 }
 
-/**
- * @brief Converts a signal value into Hann window.
- *
- * @param n The value to convert.
- * @return The converted value.
- */
-static double
-hann(double n)
-{
-    return .5 - .5 * cos(2 * M_PI * n / FRAME_SIZE);
-}
+// /**
+//  * @brief Converts a signal value into Hann window.
+//  *
+//  * @param n The value to convert.
+//  * @return The converted value.
+//  */
+// static double
+// hann(double n)
+// {
+//     return .5 - .5 * cos(2 * M_PI * n / FRAME_SIZE);
+// }
 
 int main(int argc, char** argv)
 {
@@ -226,16 +226,19 @@ int main(int argc, char** argv)
         fill_buffer(buffer, new_buffer);
 
         // Fill FFT buffer (frame buffer and zeros if necessary).
-        for (int i = 0; i < FFT_SIZE; i++)
-            fft_buffer[i] = i < FRAME_SIZE ? buffer[i] * hann(i) : 0.;
+        for (int i = 0; i < FFT_SIZE; i++) {
+            // fft_buffer[i] = i < FRAME_SIZE ? buffer[i] * hann(i) : 0.; // For using w/ Hann.
+            fft_buffer[i] = i < FRAME_SIZE ? buffer[i] : 0.;
+        }
 
         // Execute FFT.
         fft(fft_buffer, data_in);
         cartesian_to_polar(data_out, amp, phs);
+        printf("ok\n"), exit(1);
 
         // Normalize amplitude signal (values between 0 and 1).
-        for (int i = 0; i < FFT_SIZE; i++)
-            amp[i] *= 2. / FRAME_SIZE;
+        // for (int i = 0; i < FFT_SIZE; i++)
+        //     amp[i] *= 2. / FRAME_SIZE;
 
         // Retrieve maximum amplitude, and position associated.
         double max_amp = amp[0];
@@ -275,7 +278,8 @@ int main(int argc, char** argv)
         // Display the frame.
         if (PLOT) {
             gnuplot_resetplot(h);
-            gnuplot_plot_x(h, amp, FRAME_SIZE / 2, "temporal frame");
+            gnuplot_plot_x(h, buffer, FRAME_SIZE, "Temporal Frame");
+            gnuplot_plot_x(h, amp, FRAME_SIZE / 10, "Spectral Frame");
             sleep(1);
         }
 
