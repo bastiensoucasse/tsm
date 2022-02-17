@@ -10,7 +10,7 @@
 
 #define PLOT false
 
-#define FRAME_SIZE 158760
+#define FRAME_SIZE 8820
 #define HOP_SIZE 4410
 
 static gnuplot_ctrl* gnuplot;
@@ -77,6 +77,22 @@ cartesian_to_polar(double* const amplitudes, double* const phases, const double 
 {
     for (unsigned int sample = 0; sample < FRAME_SIZE; sample++)
         amplitudes[sample] = cabs(fft_out[sample]), phases[sample] = carg(fft_out[sample]);
+}
+
+static void
+get_peaks(const double* const amplitudes)
+{
+    unsigned int peak_1_sample, peak_2_sample;
+
+    for (unsigned int sample = 1; sample < FRAME_SIZE - 1; sample++) {
+        if (amplitudes[sample] >= amplitudes[sample - 1] && amplitudes[sample] > amplitudes[sample + 1]) {
+            if (amplitudes[sample] > peak_1_sample) {
+                peak_2_sample = peak_1_sample;
+                peak_1_sample = sample;
+            } else if (amplitudes[sample] > peak_2_sample)
+                peak_2_sample = sample;
+        }
+    }
 }
 
 static void
@@ -155,15 +171,18 @@ int main(const int argc, const char* const* const argv)
             continue;
         }
 
-        const double maximum_amplitude_frequency = maximum_amplitude_sample * sample_rate / FRAME_SIZE;
-        printf("Max amplitude frequency: %.2lf (± %.2lf) Hz.\n", maximum_amplitude_frequency, fft_frequency_precision);
+        // const double maximum_amplitude_frequency = maximum_amplitude_sample * sample_rate / FRAME_SIZE;
+        // printf("Max amplitude frequency: %.2lf (± %.2lf) Hz.\n", maximum_amplitude_frequency, fft_frequency_precision);
 
-        const double left = 20 * log(amplitudes[maximum_amplitude_sample - 1]);
-        const double current = 20 * log(amplitudes[maximum_amplitude_sample]);
-        const double right = 20 * log(amplitudes[maximum_amplitude_sample + 1]);
-        const double delta = .5 * (left - right) / (left - 2 * current + right);
-        const double peak_frequency = (maximum_amplitude_sample + delta) * sample_rate / FRAME_SIZE;
-        printf("Estimated peak frequency: %.2lf Hz.\n", peak_frequency);
+        // const double left = 20 * log(amplitudes[maximum_amplitude_sample - 1]);
+        // const double current = 20 * log(amplitudes[maximum_amplitude_sample]);
+        // const double right = 20 * log(amplitudes[maximum_amplitude_sample + 1]);
+        // const double delta = .5 * (left - right) / (left - 2 * current + right);
+        // const double peak_frequency = (maximum_amplitude_sample + delta) * sample_rate / FRAME_SIZE;
+        // printf("Estimated peak frequency: %.2lf Hz.\n", peak_frequency);
+
+        int peaks = get_peaks(amplitudes);
+        printf("%d peaks found\n", peaks);
 
         if (PLOT) {
             gnuplot_resetplot(gnuplot);

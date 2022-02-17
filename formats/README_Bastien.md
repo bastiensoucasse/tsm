@@ -42,3 +42,15 @@ En lançant l’analyse pour chaque trame de 0.2 s, on trouve au minimum 2 pics,
 En effet, les trames contenant 2 pics sont celles dont une seule touche est préssée durant toute la trame. Alors que s'il y a deux touches préssées durant la trame (fin d'une touche au début de la trame, et début d'une autre à la fin), il y a alors les fréquences des deux touches qui se mélangent.
 
 Le problème est résolu en changeant `HOP_SIZE` à 4410, la taille minimale d'un silence. [?]
+
+### Question 4
+
+Code…
+
+### Question 5
+
+Ayant résolu le problème de superposition de signaux, on devrait trouver deux pics pour chaque frame. Seulement, on en trouve des milliers par frame. Il faudrait conserver les deux plus hauts pics uniquement. 
+
+### Question 6
+
+
