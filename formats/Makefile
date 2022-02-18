@@ -1,5 +1,5 @@
 CC := clang
-CFLAGS := -I$(HOMEBREW_PATH)/include -O3 -Wall
+CFLAGS := -I$(HOMEBREW_PATH)/include -O3 -Wall -g
 LDFLAGS := -I$(HOMEBREW_PATH)/lib -lsndfile -lvorbis -lvorbisenc -logg -lFLAC -lm -lfftw3
 
 .PHONY: all

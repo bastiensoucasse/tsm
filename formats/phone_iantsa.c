@@ -8,8 +8,8 @@
 
 #include "gnuplot_i.h"
 
-#define VERBOSE true
-#define PLOT false
+#define VERBOSE false
+#define PLOT true
 
 #define FRAME_SIZE 158760
 #define HOP_SIZE 1024
@@ -234,7 +234,6 @@ int main(int argc, char** argv)
         // Execute FFT.
         fft(fft_buffer, data_in);
         cartesian_to_polar(data_out, amp, phs);
-        printf("ok\n"), exit(1);
 
         // Normalize amplitude signal (values between 0 and 1).
         // for (int i = 0; i < FFT_SIZE; i++)
@@ -278,7 +277,7 @@ int main(int argc, char** argv)
         // Display the frame.
         if (PLOT) {
             gnuplot_resetplot(h);
-            gnuplot_plot_x(h, buffer, FRAME_SIZE, "Temporal Frame");
+            // gnuplot_plot_x(h, buffer, FRAME_SIZE, "Temporal Frame");
             gnuplot_plot_x(h, amp, FRAME_SIZE / 10, "Spectral Frame");
             sleep(1);
         }
