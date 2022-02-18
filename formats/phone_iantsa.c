@@ -11,12 +11,15 @@
 #define VERBOSE false
 #define PLOT true
 
-#define FRAME_SIZE 158760
-#define HOP_SIZE 1024
+#define FRAME_SIZE 8820
+#define HOP_SIZE 4410
 #define FFT_SIZE FRAME_SIZE
 
 static gnuplot_ctrl* h; // Plot graph.
 static fftw_plan plan; // FFT plan.
+
+static double tab[12][2];
+
 
 /**
  * @brief Prints usage on the console.
@@ -145,6 +148,49 @@ fft_exit()
     fftw_destroy_plan(plan);
 }
 
+/**
+ * @brief Prints the number of local maxima in amplitude spectrum
+ * Note: first and last sample cannot be local maxima
+ * 
+ * @param amp 
+ */
+static void
+retrieve_peaks(double amp[FFT_SIZE])
+{
+    int n_peaks = 0;
+    for (int i = 1; i < FFT_SIZE - 1; i++)
+        if (amp[i] >= amp[i-1] && amp[i] > amp[i+1])
+            n_peaks++;
+
+    printf("%d peaks found\n", n_peaks);
+}
+
+/**
+ * @brief Retrieves sample index of the 2 local maxima with maximum amplitude
+ * Note: first and last sample cannot be local maxima
+ * 
+ * @param amp 
+ */
+static void
+retrieve_2_peaks(double amp[FFT_SIZE], int nb, int SAMPLE_RATE)
+{
+    int peak1_sample = 0, peak2_sample = 0;
+    for (int i = 1; i < FFT_SIZE/2 - 1; i++)
+        if (amp[i] >= amp[i-1] && amp[i] > amp[i+1])
+        {
+            if (amp[i] > amp[peak1_sample])
+            {
+                peak2_sample = peak1_sample;
+                peak1_sample = i;
+            } 
+            else if (amp[i] > amp[peak2_sample])
+                peak2_sample = i;
+        }
+    
+    tab[nb][0] = peak1_sample * SAMPLE_RATE / FFT_SIZE;
+    tab[nb][1] = peak2_sample * SAMPLE_RATE / FFT_SIZE;
+}
+
 // /**
 //  * @brief Converts a signal value into Hann window.
 //  *
@@ -234,6 +280,10 @@ int main(int argc, char** argv)
         // Execute FFT.
         fft(fft_buffer, data_in);
         cartesian_to_polar(data_out, amp, phs);
+<<<<<<< HEAD
+=======
+        // printf("ok\n"), exit(1);
+>>>>>>> e3ae2f447893a8bb458f91e7010d368a87c2af65
 
         // Normalize amplitude signal (values between 0 and 1).
         // for (int i = 0; i < FFT_SIZE; i++)
@@ -256,23 +306,32 @@ int main(int argc, char** argv)
             continue;
         }
 
-        if (VERBOSE)
-            printf("Max amplitude: %lf.\n", max_amp);
+        // if (VERBOSE)
+        //     printf("Max amplitude: %lf.\n", max_amp);
 
-        // Define FFT frequency precision.
-        double freq_prec = SAMPLE_RATE / (2. * FFT_SIZE);
+        // // Define FFT frequency precision.
+        // double freq_prec = SAMPLE_RATE / (2. * FFT_SIZE);
 
-        // Compute maximum amplitude frequency.
-        double max_amp_freq = max_amp_i * SAMPLE_RATE / FFT_SIZE;
-        printf("Max amplitude frequency: %lf (± %lf) Hz.\n", max_amp_freq, freq_prec);
+        // // Compute maximum amplitude frequency.
+        // double max_amp_freq = max_amp_i * SAMPLE_RATE / FFT_SIZE;
+        // printf("Max amplitude frequency: %lf (± %lf) Hz.\n", max_amp_freq, freq_prec);
 
-        // Estimate peak frequency (parabolic interpolation).
-        double al = 20 * log(amp[max_amp_i - 1]);
-        double ac = 20 * log(amp[max_amp_i]);
-        double ar = 20 * log(amp[max_amp_i + 1]);
-        double delta = .5 * (al - ar) / (al - 2 * ac + ar);
-        double peak_freq = (max_amp_i + delta) * SAMPLE_RATE / FFT_SIZE;
-        printf("Estimated peak frequency: %lf Hz.\n", peak_freq);
+        // // Estimate peak frequency (parabolic interpolation).
+        // double al = 20 * log(amp[max_amp_i - 1]);
+        // double ac = 20 * log(amp[max_amp_i]);
+        // double ar = 20 * log(amp[max_amp_i + 1]);
+        // double delta = .5 * (al - ar) / (al - 2 * ac + ar);
+        // double peak_freq = (max_amp_i + delta) * SAMPLE_RATE / FFT_SIZE;
+        // printf("Estimated peak frequency: %lf Hz.\n", peak_freq);
+
+        // retrieve_peaks(amp);
+
+        int nb;
+        if (nb_frames % 3 == 0)
+        {
+            nb = nb_frames / 3;
+            retrieve_2_peaks(amp, nb, SAMPLE_RATE);
+        }
 
         // Display the frame.
         if (PLOT) {
@@ -285,6 +344,10 @@ int main(int argc, char** argv)
         // Increase frame id for next frame.
         nb_frames++;
     }
+
+    for (int i = 0; i < 12; i++)
+        printf("%d = (%lf, %lf)\n", (i+1)%10, tab[i][0], tab[i][1]);
+
 
     // Shut down FFT, close file and exit program.
     fft_exit();
