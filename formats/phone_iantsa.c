@@ -9,16 +9,16 @@
 #include "gnuplot_i.h"
 
 #define VERBOSE false
-#define PLOT true
+#define PLOT false
 
-#define FRAME_SIZE 8820
-#define HOP_SIZE 4410
+#define FRAME_SIZE 8840 // 158760
+#define HOP_SIZE 4410 // 1024
 #define FFT_SIZE FRAME_SIZE
 
 static gnuplot_ctrl* h; // Plot graph.
 static fftw_plan plan; // FFT plan.
 
-static double tab[12][2];
+static int tab[12][2];
 
 
 /**
@@ -155,7 +155,7 @@ fft_exit()
  * @param amp 
  */
 static void
-retrieve_peaks(double amp[FFT_SIZE])
+display_nb_peaks(double amp[FFT_SIZE])
 {
     int n_peaks = 0;
     for (int i = 1; i < FFT_SIZE - 1; i++)
@@ -239,7 +239,7 @@ int main(int argc, char** argv)
     h = gnuplot_init();
     gnuplot_setstyle(h, "lines");
 
-    // Check wether FRAME_SIZE & HOP_FILE are correct for file.
+    // Check whether FRAME_SIZE & HOP_FILE are correct for file.
     for (int i = 0; i < FRAME_SIZE / HOP_SIZE - 1; i++) {
         if (read_samples(infile, new_buffer, sfinfo.channels) == 1)
             fill_buffer(buffer, new_buffer);
@@ -252,8 +252,8 @@ int main(int argc, char** argv)
     // Retrieve file info.
     const unsigned int SAMPLE_RATE = sfinfo.samplerate; // 44100 Hz.
     const unsigned char NUM_CHANNELS = sfinfo.channels; // 1 (mono).
-    const unsigned int SIZE = (int)sfinfo.frames; // 132300.
-
+    const unsigned int SIZE = (int)sfinfo.frames; 
+    
     // Display file info.
     printf("Sample Rate: %d.\n", SAMPLE_RATE);
     printf("Channels: %d.\n", NUM_CHANNELS);
@@ -272,18 +272,14 @@ int main(int argc, char** argv)
         fill_buffer(buffer, new_buffer);
 
         // Fill FFT buffer (frame buffer and zeros if necessary).
-        for (int i = 0; i < FFT_SIZE; i++) {
-            // fft_buffer[i] = i < FRAME_SIZE ? buffer[i] * hann(i) : 0.; // For using w/ Hann.
-            fft_buffer[i] = i < FRAME_SIZE ? buffer[i] : 0.;
-        }
+        // for (int i = 0; i < FFT_SIZE; i++) {
+        //     // fft_buffer[i] = i < FRAME_SIZE ? buffer[i] * hann(i) : 0.; // For using w/ Hann.
+        //     fft_buffer[i] = i < FRAME_SIZE ? buffer[i] : 0.;
+        // }
 
         // Execute FFT.
-        fft(fft_buffer, data_in);
+        fft(buffer, data_in);
         cartesian_to_polar(data_out, amp, phs);
-<<<<<<< HEAD
-=======
-        // printf("ok\n"), exit(1);
->>>>>>> e3ae2f447893a8bb458f91e7010d368a87c2af65
 
         // Normalize amplitude signal (values between 0 and 1).
         // for (int i = 0; i < FFT_SIZE; i++)
@@ -324,8 +320,9 @@ int main(int argc, char** argv)
         // double peak_freq = (max_amp_i + delta) * SAMPLE_RATE / FFT_SIZE;
         // printf("Estimated peak frequency: %lf Hz.\n", peak_freq);
 
-        // retrieve_peaks(amp);
+        // display_nb_peaks(amp);
 
+        // Fill correspondance table
         int nb;
         if (nb_frames % 3 == 0)
         {
@@ -345,9 +342,11 @@ int main(int argc, char** argv)
         nb_frames++;
     }
 
-    for (int i = 0; i < 12; i++)
-        printf("%d = (%lf, %lf)\n", (i+1)%10, tab[i][0], tab[i][1]);
-
+    // Check correspondance table values
+    for (int i = 0; i < 10; i++)
+        printf("%d = (%d, %d)\n", (i+1)%10, tab[i][0], tab[i][1]);
+    printf("* = (%d, %d)\n", tab[10][0], tab[10][1]);
+    printf("# = (%d, %d)\n", tab[11][0], tab[11][1]);
 
     // Shut down FFT, close file and exit program.
     fft_exit();
