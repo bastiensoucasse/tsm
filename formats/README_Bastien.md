@@ -73,3 +73,22 @@ $t = 0.06 \; \text{s}$
 
 Représentation temporelle :\
 $n = F_e t = 2646 \; \text{échantillons}$
+
+En analysant chaque frame, on se rend compte que les numéros apparaissent plusieurs fois (plusieurs frames sont sur la même touche), mais qu'ils sont bien séparés par des frames « inutiles ».
+
+On se rend compte que le numéro composé ici est donc 0556846500.
+
+### Détection de touches
+
+En analysant les énergies de chaque frame, on décide de garder les frames dont l'énergie est supérieure à 0.00001.
+
+### Analyse de numéros
+
+On ne garde que la première frame d'un numéro (on attend de trouver une frame « inutile » avant de récupérer le prochain numéro), et on stocke ces numéros, pour afficher la totalité à la fin.
+
+On peut alors tester pour tous les fichiers d'entrée :
+- `telbase.wav` : 1234567890*#
+- `telA.wav` : 0556846500
+- `telB.wav` : 227772888666
+- `telC.wav` : 0556340548
+- `telD.wav` : 0556846500

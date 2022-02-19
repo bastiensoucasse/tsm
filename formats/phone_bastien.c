@@ -196,7 +196,7 @@ int main(const int argc, const char* const* const argv)
 
     int frame_id = 0;
     int number_capacity = 10, number_size = 0;
-    char *number = (char *)malloc(number_capacity * sizeof(char));
+    char* number = (char*)malloc(number_capacity * sizeof(char));
     bool next = true;
     while (read_samples(hop_buffer, input_file, channels)) {
         fill_frame_buffer(frame_buffer, hop_buffer);
@@ -219,7 +219,7 @@ int main(const int argc, const char* const* const argv)
         get_peak_frequencies(peak_frequencies, amplitudes, sample_rate);
         if (number_size == number_capacity) {
             number_capacity += 1;
-            number = (char *)realloc(number, number_capacity * sizeof(char));
+            number = (char*)realloc(number, number_capacity * sizeof(char));
         }
         number[number_size] = get_key(peak_frequencies);
 
