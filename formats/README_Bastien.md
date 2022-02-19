@@ -6,7 +6,7 @@ Bastien Soucasse
 
 ### Question 1
 
-On doit travailler sur une trame où il n’y a qu’une seule touche à la fois pour ne pas mélanger les fréquences analysées. La durée minimale de pression d’une touche étant 0.2 s, on choisit une durée de trame équivalente.
+On cherche à récupérer les fréquences de chaque touche grâce au fichier `telbase.wav`. On doit travailler sur une trame où il n’y a qu’une seule touche à la fois pour ne pas mélanger les fréquences analysées. La durée minimale de pression d’une touche étant 0.2 s, on choisit une durée de trame équivalente.
 
 Durée :\
 $t = 0.2 \; \text{s}$
@@ -15,9 +15,9 @@ Résolution temporelle :\
 $n = F_e t = 8820 \; \text{échantillons}$
 
 Résolution fréquentielle :\
-$\Delta f = \frac{F_e}{2 n} = 2.5 \; \text{Hz}$
+$\Delta f = \frac{F_e}{n} = 5 \; \text{Hz}$
 
-Il n’y a pas de précautions à prendre. On sait que les fréquences sont éloignées de plus de 2.5 Hz entre elles.
+Il n’y a pas de précautions à prendre. On sait que les fréquences sont éloignées de plus de 5 Hz entre elles.
 
 ### Question 2
 
@@ -39,9 +39,9 @@ En écoutant les sons de chaque touche, on peut comprendre qu’une fréquence e
 
 En lançant l’analyse pour chaque trame de 0.2 s, on trouve au minimum 2 pics, et 3 au maximum.
 
-En effet, les trames contenant 2 pics sont celles dont une seule touche est préssée durant toute la trame. Alors que s'il y a deux touches préssées durant la trame (fin d'une touche au début de la trame, et début d'une autre à la fin), il y a alors les fréquences des deux touches qui se mélangent.
+En effet, les trames contenant 2 pics sont celles dont une seule touche est préssée durant toute la trame. Alors que s’il y a deux touches préssées durant la trame (fin d’une touche au début de la trame, et début d’une autre à la fin), il y a alors les fréquences des deux touches qui se mélangent.
 
-Le problème est résolu en changeant `HOP_SIZE` à 4410, la taille minimale d'un silence. [?]
+Le problème est résolu en changeant `HOP_SIZE` à 4410, la taille minimale d’un silence, on va éviter tout chevauchement, on aura donc forcément 2 pics.
 
 ### Question 4
 
@@ -49,8 +49,27 @@ Code…
 
 ### Question 5
 
-Ayant résolu le problème de superposition de signaux, on devrait trouver deux pics pour chaque frame. Seulement, on en trouve des milliers par frame. Il faudrait conserver les deux plus hauts pics uniquement. 
+Ayant résolu le problème de superposition de signaux, on devrait stocker deux pics pour chaque frame. Seulement, on en stocke des milliers par frame. Il faudrait conserver les deux plus hauts pics uniquement.
 
 ### Question 6
 
+Précision :\
+$f_{\text{prec}} = \frac{\Delta f}{2} = 2.5 \; \text{Hz}$
 
+Pour améliorer cette précision, on met en place une interpolation parabolique, cela va permettre d’estimer une valeur plus proche de la fréquence exacte du pic.
+
+### Question 7
+
+En analysant les fréquences de chaque touche, on obtient un couple qui correspond de manière très fidèle aux valeurs précisées dans le tableau suivant.
+
+![Fréquences par touche](key_frequencies.png)
+
+### Question 8
+
+Une fois cette calibration faite, on peut analyser le fichier `telA.wav` « à la main ».
+
+Durée :\
+$t = 0.06 \; \text{s}$
+
+Représentation temporelle :\
+$n = F_e t = 2646 \; \text{échantillons}$
