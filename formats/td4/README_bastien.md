@@ -78,11 +78,11 @@ En analysant chaque frame, on se rend compte que les numéros apparaissent plusi
 
 On se rend compte que le numéro composé ici est donc 0556846500.
 
-### Détection de touches
+## Détection de touches
 
 En analysant les énergies de chaque frame, on décide de garder les frames dont l'énergie est supérieure à 0.00001.
 
-### Analyse de numéros
+## Analyse de numéros
 
 On ne garde que la première frame d'un numéro (on attend de trouver une frame « inutile » avant de récupérer le prochain numéro), et on stocke ces numéros, pour afficher la totalité à la fin.
 
@@ -92,3 +92,4 @@ On peut alors tester pour tous les fichiers d'entrée :
 - `telB.wav` : 227772888666
 - `telC.wav` : 0556340548
 - `telD.wav` : 0556846500
+- `telE.wav` : 0540006000

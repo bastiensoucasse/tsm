@@ -10,6 +10,9 @@
 #define FRAME_SIZE 2646
 #define HOP_SIZE 2646
 
+#define CALIBRATION_FRAME_SIZE 8820
+#define CALIBRATION_HOP_SIZE 4410
+
 static const char keys[4][4] = {
     { '1', '2', '3', 'A' },
     { '4', '5', '6', 'B' },
@@ -23,7 +26,7 @@ static const int column_frequencies[4] = { 1209, 1336, 1477, 1633 };
 static fftw_plan fft_plan;
 
 static bool
-read_samples(double* const hop_buffer, const int hop_size, SNDFILE* const input_file, const char channels)
+read_samples(double* const hop_buffer, SNDFILE* const input_file, const int hop_size, const char channels)
 {
     if (channels == 2) {
         double tmp[2 * hop_size];
@@ -43,7 +46,7 @@ read_samples(double* const hop_buffer, const int hop_size, SNDFILE* const input_
 }
 
 static void
-fill_frame_buffer(const double* const hop_buffer, const int hop_size, double* const frame_buffer, const int frame_size)
+fill_frame_buffer(double* const frame_buffer, const double* const hop_buffer, const int frame_size, const int hop_size)
 {
     double tmp[frame_size - hop_size];
 
@@ -71,35 +74,35 @@ frame_is_useful(const double* const frame_buffer, const int frame_size)
 }
 
 static void
-fft_init(fftw_complex* const fft_in, fftw_complex* const fft_out, const int frame_size)
+fft_init(fftw_complex* const fft_in, fftw_complex* const fft_out, const int fft_size)
 {
-    fft_plan = fftw_plan_dft_1d(frame_size, fft_in, fft_out, FFTW_FORWARD, FFTW_ESTIMATE);
+    fft_plan = fftw_plan_dft_1d(fft_size, fft_in, fft_out, FFTW_FORWARD, FFTW_ESTIMATE);
 }
 
 static void
-fft(fftw_complex* const fft_in, const double* const signal, const int frame_size)
+fft(fftw_complex* const fft_in, const double* const signal, const int fft_size, const int frame_size)
 {
-    for (int sample = 0; sample < frame_size; sample++)
-        fft_in[sample] = signal[sample];
+    for (int sample = 0; sample < fft_size; sample++)
+        fft_in[sample] = sample < frame_size ? signal[sample] : 0.;
 
     fftw_execute(fft_plan);
 }
 
 static void
-cartesian_to_polar(double* const amplitudes, double* const phases, const double complex* const fft_out, const int frame_size)
+cartesian_to_polar(double* const amplitudes, double* const phases, const double complex* const fft_out, const int fft_size)
 {
-    for (int sample = 0; sample < frame_size; sample++) {
+    for (int sample = 0; sample < fft_size; sample++) {
         amplitudes[sample] = cabs(fft_out[sample]);
         phases[sample] = carg(fft_out[sample]);
     }
 }
 
 static void
-get_peak_frequencies(double* const peak_frequencies, const double* const amplitudes, const int sample_rate, const int frame_size)
+get_peak_frequencies(double* const peak_frequencies, const double* const amplitudes, const int sample_rate, const int fft_size)
 {
     int peak_samples[2] = { 1, 1 };
 
-    for (int sample = 1; sample < frame_size / 2 - 1; sample++)
+    for (int sample = 1; sample < fft_size / 2 - 1; sample++)
         if (amplitudes[sample] >= amplitudes[sample - 1] && amplitudes[sample] > amplitudes[sample + 1]) {
             if (amplitudes[sample] > amplitudes[peak_samples[0]]) {
                 peak_samples[1] = peak_samples[0];
@@ -114,7 +117,7 @@ get_peak_frequencies(double* const peak_frequencies, const double* const amplitu
         current = 20 * log(amplitudes[peak_samples[peak]]);
         right = 20 * log(amplitudes[peak_samples[peak] + 1]);
         delta = .5 * (left - right) / (left - 2 * current + right);
-        peak_frequencies[peak] = (peak_samples[peak] + delta) * sample_rate / frame_size;
+        peak_frequencies[peak] = (peak_samples[peak] + delta) * sample_rate / fft_size;
     }
 }
 
@@ -153,7 +156,7 @@ fft_exit()
 }
 
 static void
-calibrate(const char* const input_file_name, const int hop_size, const int frame_size)
+calibrate(const char* const input_file_name, const int frame_size, const int hop_size)
 {
     SNDFILE* input_file = NULL;
     SF_INFO input_info;
@@ -170,8 +173,8 @@ calibrate(const char* const input_file_name, const int hop_size, const int frame
     double frame_buffer[frame_size];
 
     for (int sample = 0; sample < frame_size / hop_size - 1; sample++) {
-        if (read_samples(hop_buffer, hop_size, input_file, channels))
-            fill_frame_buffer(hop_buffer, hop_size, frame_buffer, frame_size);
+        if (read_samples(hop_buffer, input_file, hop_size, channels))
+            fill_frame_buffer(frame_buffer, hop_buffer, frame_size, hop_size);
         else {
             fprintf(stderr, "Not enough samples.\n");
             exit(EXIT_FAILURE);
@@ -180,13 +183,14 @@ calibrate(const char* const input_file_name, const int hop_size, const int frame
 
     const int keys_pressed[12][2] = { { 0, 0 }, { 0, 1 }, { 0, 2 }, { 1, 0 }, { 1, 1 }, { 1, 2 }, { 2, 0 }, { 2, 1 }, { 2, 2 }, { 3, 1 }, { 3, 0 }, { 3, 2 } };
 
-    fftw_complex fft_in[frame_size], fft_out[frame_size];
-    double amplitudes[frame_size], phases[frame_size];
-    fft_init(fft_in, fft_out, frame_size);
+    int fft_size = frame_size;
+    fftw_complex fft_in[fft_size], fft_out[fft_size];
+    double amplitudes[fft_size], phases[fft_size];
+    fft_init(fft_in, fft_out, fft_size);
 
     int frame_id = 0;
-    while (read_samples(hop_buffer, hop_size, input_file, channels)) {
-        fill_frame_buffer(hop_buffer, hop_size, frame_buffer, frame_size);
+    while (read_samples(hop_buffer, input_file, hop_size, channels)) {
+        fill_frame_buffer(frame_buffer, hop_buffer, frame_size, hop_size);
 
         if (frame_id % 3 != 0) {
             frame_id++;
@@ -195,12 +199,12 @@ calibrate(const char* const input_file_name, const int hop_size, const int frame
 
         printf("Calibrating key %c…\n", keys[keys_pressed[frame_id / 3][0]][keys_pressed[frame_id / 3][1]]);
 
-        fft(fft_in, frame_buffer, frame_size);
-        cartesian_to_polar(amplitudes, phases, fft_out, frame_size);
+        fft(fft_in, frame_buffer, fft_size, frame_size);
+        cartesian_to_polar(amplitudes, phases, fft_out, fft_size);
 
         double peak_frequencies[2];
-        get_peak_frequencies(peak_frequencies, amplitudes, sample_rate, frame_size);
-        printf("Key Frequencies: %.2lf Hz & %.2lf Hz.\n", peak_frequencies[0], peak_frequencies[1]);
+        get_peak_frequencies(peak_frequencies, amplitudes, sample_rate, fft_size);
+        printf("%.2lf Hz & %.2lf Hz.\n", peak_frequencies[1] < peak_frequencies[0] ? peak_frequencies[1] : peak_frequencies[0], peak_frequencies[1] < peak_frequencies[0] ? peak_frequencies[0] : peak_frequencies[1]);
 
         frame_id++;
     }
@@ -211,7 +215,7 @@ calibrate(const char* const input_file_name, const int hop_size, const int frame
 }
 
 static char*
-get_number(int* const number_size, const char* const input_file_name, const int hop_size, const int frame_size)
+get_number(int* const number_size, const char* const input_file_name, const int frame_size, const int hop_size)
 {
     SNDFILE* input_file = NULL;
     SF_INFO input_info;
@@ -228,25 +232,26 @@ get_number(int* const number_size, const char* const input_file_name, const int 
     double frame_buffer[frame_size];
 
     for (int sample = 0; sample < frame_size / hop_size - 1; sample++) {
-        if (read_samples(hop_buffer, hop_size, input_file, channels))
-            fill_frame_buffer(hop_buffer, hop_size, frame_buffer, frame_size);
+        if (read_samples(hop_buffer, input_file, hop_size, channels))
+            fill_frame_buffer(frame_buffer, hop_buffer, frame_size, hop_size);
         else {
             fprintf(stderr, "Not enough samples.\n");
             exit(EXIT_FAILURE);
         }
     }
 
-    fftw_complex fft_in[frame_size], fft_out[frame_size];
-    double amplitudes[frame_size], phases[frame_size];
-    fft_init(fft_in, fft_out, frame_size);
+    int fft_size = frame_size;
+    fftw_complex fft_in[fft_size], fft_out[fft_size];
+    double amplitudes[fft_size], phases[fft_size];
+    fft_init(fft_in, fft_out, fft_size);
 
     int frame_id = 0;
     int number_capacity = 10;
     *number_size = 0;
     char* number = (char*)malloc(number_capacity * sizeof(char));
     bool next = true;
-    while (read_samples(hop_buffer, hop_size, input_file, channels)) {
-        fill_frame_buffer(hop_buffer, hop_size, frame_buffer, frame_size);
+    while (read_samples(hop_buffer, input_file, hop_size, channels)) {
+        fill_frame_buffer(frame_buffer, hop_buffer, frame_size, hop_size);
 
         if (!frame_is_useful(frame_buffer, frame_size)) {
             next = true;
@@ -259,11 +264,11 @@ get_number(int* const number_size, const char* const input_file_name, const int 
             continue;
         }
 
-        fft(fft_in, frame_buffer, frame_size);
-        cartesian_to_polar(amplitudes, phases, fft_out, frame_size);
+        fft(fft_in, frame_buffer, fft_size, frame_size);
+        cartesian_to_polar(amplitudes, phases, fft_out, fft_size);
 
         double peak_frequencies[2];
-        get_peak_frequencies(peak_frequencies, amplitudes, sample_rate, frame_size);
+        get_peak_frequencies(peak_frequencies, amplitudes, sample_rate, fft_size);
         if (*number_size == number_capacity) {
             number_capacity += 1;
             number = (char*)realloc(number, number_capacity * sizeof(char));
@@ -290,22 +295,29 @@ print_number(const char* const number, const int number_size, const char* const 
 
 int main(const int argc, const char* const* const argv)
 {
-    calibrate("sounds/telbase.wav", 4410, 8820);
+    calibrate("sounds/telbase.wav", CALIBRATION_FRAME_SIZE, CALIBRATION_HOP_SIZE);
 
     char* number;
     int number_size;
 
-    number = get_number(&number_size, "sounds/telA.wav", HOP_SIZE, FRAME_SIZE);
+    number = get_number(&number_size, "sounds/telbase.wav", FRAME_SIZE, HOP_SIZE);
+    print_number(number, number_size, "sounds/telbase.wav");
+
+    number = get_number(&number_size, "sounds/telA.wav", FRAME_SIZE, HOP_SIZE);
     print_number(number, number_size, "sounds/telA.wav");
 
-    number = get_number(&number_size, "sounds/telB.wav", HOP_SIZE, FRAME_SIZE);
+    number = get_number(&number_size, "sounds/telB.wav", FRAME_SIZE, HOP_SIZE);
     print_number(number, number_size, "sounds/telB.wav");
 
-    number = get_number(&number_size, "sounds/telC.wav", HOP_SIZE, FRAME_SIZE);
+    number = get_number(&number_size, "sounds/telC.wav", FRAME_SIZE, HOP_SIZE);
     print_number(number, number_size, "sounds/telC.wav");
 
-    number = get_number(&number_size, "sounds/telD.wav", HOP_SIZE, FRAME_SIZE);
+    number = get_number(&number_size, "sounds/telD.wav", FRAME_SIZE, HOP_SIZE);
     print_number(number, number_size, "sounds/telD.wav");
 
+    number = get_number(&number_size, "sounds/telE.wav", FRAME_SIZE, HOP_SIZE);
+    print_number(number, number_size, "sounds/telE.wav");
+
+    free(number);
     return EXIT_SUCCESS;
 }

@@ -20,7 +20,6 @@ static fftw_plan plan; // FFT plan.
 
 static int tab[12][2];
 
-
 /**
  * @brief Prints usage on the console.
  *
@@ -151,15 +150,15 @@ fft_exit()
 /**
  * @brief Prints the number of local maxima in amplitude spectrum
  * Note: first and last sample cannot be local maxima
- * 
- * @param amp 
+ *
+ * @param amp
  */
 static void
 display_nb_peaks(double amp[FFT_SIZE])
 {
     int n_peaks = 0;
     for (int i = 1; i < FFT_SIZE - 1; i++)
-        if (amp[i] >= amp[i-1] && amp[i] > amp[i+1])
+        if (amp[i] >= amp[i - 1] && amp[i] > amp[i + 1])
             n_peaks++;
 
     printf("%d peaks found\n", n_peaks);
@@ -168,25 +167,22 @@ display_nb_peaks(double amp[FFT_SIZE])
 /**
  * @brief Retrieves sample index of the 2 local maxima with maximum amplitude
  * Note: first and last sample cannot be local maxima
- * 
- * @param amp 
+ *
+ * @param amp
  */
 static void
 retrieve_2_peaks(double amp[FFT_SIZE], int nb, int SAMPLE_RATE)
 {
     int peak1_sample = 0, peak2_sample = 0;
-    for (int i = 1; i < FFT_SIZE/2 - 1; i++)
-        if (amp[i] >= amp[i-1] && amp[i] > amp[i+1])
-        {
-            if (amp[i] > amp[peak1_sample])
-            {
+    for (int i = 1; i < FFT_SIZE / 2 - 1; i++)
+        if (amp[i] >= amp[i - 1] && amp[i] > amp[i + 1]) {
+            if (amp[i] > amp[peak1_sample]) {
                 peak2_sample = peak1_sample;
                 peak1_sample = i;
-            } 
-            else if (amp[i] > amp[peak2_sample])
+            } else if (amp[i] > amp[peak2_sample])
                 peak2_sample = i;
         }
-    
+
     tab[nb][0] = peak1_sample * SAMPLE_RATE / FFT_SIZE;
     tab[nb][1] = peak2_sample * SAMPLE_RATE / FFT_SIZE;
 }
@@ -252,8 +248,8 @@ int main(int argc, char** argv)
     // Retrieve file info.
     const unsigned int SAMPLE_RATE = sfinfo.samplerate; // 44100 Hz.
     const unsigned char NUM_CHANNELS = sfinfo.channels; // 1 (mono).
-    const unsigned int SIZE = (int)sfinfo.frames; 
-    
+    const unsigned int SIZE = (int)sfinfo.frames;
+
     // Display file info.
     printf("Sample Rate: %d.\n", SAMPLE_RATE);
     printf("Channels: %d.\n", NUM_CHANNELS);
@@ -324,8 +320,7 @@ int main(int argc, char** argv)
 
         // Fill correspondance table
         int nb;
-        if (nb_frames % 3 == 0)
-        {
+        if (nb_frames % 3 == 0) {
             nb = nb_frames / 3;
             retrieve_2_peaks(amp, nb, SAMPLE_RATE);
         }
@@ -344,7 +339,7 @@ int main(int argc, char** argv)
 
     // Check correspondance table values
     for (int i = 0; i < 10; i++)
-        printf("%d = (%d, %d)\n", (i+1)%10, tab[i][0], tab[i][1]);
+        printf("%d = (%d, %d)\n", (i + 1) % 10, tab[i][0], tab[i][1]);
     printf("* = (%d, %d)\n", tab[10][0], tab[10][1]);
     printf("# = (%d, %d)\n", tab[11][0], tab[11][1]);
 
