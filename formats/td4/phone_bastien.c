@@ -7,21 +7,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define FRAME_SIZE 2646
-#define HOP_SIZE 2646
+#define FRAME_SIZE 2866
+#define HOP_SIZE 2866
 
 #define CALIBRATION_FRAME_SIZE 8820
 #define CALIBRATION_HOP_SIZE 4410
 
-static const char keys[4][4] = {
-    { '1', '2', '3', 'A' },
-    { '4', '5', '6', 'B' },
-    { '7', '8', '9', 'C' },
-    { '*', '0', '#', 'D' }
+static const char keys[4][3] = {
+    { '1', '2', '3' },
+    { '4', '5', '6' },
+    { '7', '8', '9' },
+    { '*', '0', '#' }
 };
 
 static const int line_frequencies[4] = { 697, 770, 852, 941 };
-static const int column_frequencies[4] = { 1209, 1336, 1477, 1633 };
+static const int column_frequencies[3] = { 1209, 1336, 1477 };
 
 static fftw_plan fft_plan;
 
@@ -63,7 +63,7 @@ fill_frame_buffer(double* const frame_buffer, const double* const hop_buffer, co
 static bool
 frame_is_useful(const double* const frame_buffer, const int frame_size)
 {
-    const double threshold = .00001;
+    const double threshold = .01;
     double energy = 0.;
 
     for (int sample = 0; sample < frame_size; sample++)
@@ -212,7 +212,7 @@ calibrate(const char* const input_file_name, const int frame_size, const int hop
 
         double peak_frequencies[2];
         get_peak_frequencies(peak_frequencies, amplitudes, sample_rate, fft_size);
-        printf("%d Hz & %d Hz.\n", peak_frequencies[1] < peak_frequencies[0] ? (int)peak_frequencies[1] : (int)peak_frequencies[0], peak_frequencies[1] < peak_frequencies[0] ? (int)peak_frequencies[0] : (int)peak_frequencies[1]);
+        printf("%d Hz & %d Hz.\n", peak_frequencies[1] < peak_frequencies[0] ? (int)round(peak_frequencies[1]) : (int)round(peak_frequencies[0]), peak_frequencies[1] < peak_frequencies[0] ? (int)round(peak_frequencies[0]) : (int)round(peak_frequencies[1]));
 
         frame_id++;
     }
