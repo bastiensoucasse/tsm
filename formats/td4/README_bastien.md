@@ -69,10 +69,10 @@ En analysant les fréquences de chaque touche, on obtient un couple qui correspo
 Une fois cette calibration faite, on peut analyser le fichier `telA.wav` « à la main ».
 
 Durée :\
-$t = 0.06 \; \text{s}$
+$t = 0.065 \; \text{s}$
 
 Représentation temporelle :\
-$n = F_e t = 2646 \; \text{échantillons}$
+$n = F_e t = 2866 \; \text{échantillons}$
 
 En analysant chaque frame, on se rend compte que les numéros apparaissent plusieurs fois (plusieurs frames sont sur la même touche), mais qu'ils sont bien séparés par des frames « inutiles ».
 
