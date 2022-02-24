@@ -66,6 +66,13 @@ frame_is_useful(const double* const frame_buffer, const int frame_size)
 }
 
 static void
+hann(double* const frame_buffer, const int frame_size)
+{
+    for (int sample = 0; sample < frame_size; sample++)
+        frame_buffer[sample] *= .5 - .5 * cos(2. * M_PI * sample / FRAME_SIZE);
+}
+
+static void
 fft_init(fftw_complex* const fft_in, fftw_complex* const fft_out, const int fft_size)
 {
     fft_plan = fftw_plan_dft_1d(fft_size, fft_in, fft_out, FFTW_FORWARD, FFTW_ESTIMATE);
@@ -167,6 +174,7 @@ handle_events(const char* const input_file_name, const int frame_size, const int
             continue;
         }
 
+        hann(frame_buffer, frame_size);
         fft(fft_in, frame_buffer, fft_size, frame_size);
         cartesian_to_polar(amplitudes, phases, fft_out, fft_size);
 

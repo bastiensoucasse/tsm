@@ -74,6 +74,13 @@ frame_is_useful(const double* const frame_buffer, const int frame_size)
 }
 
 static void
+hann(double* const frame_buffer, const int frame_size)
+{
+    for (int sample = 0; sample < frame_size; sample++)
+        frame_buffer[sample] *= .5 - .5 * cos(2. * M_PI * sample / FRAME_SIZE);
+}
+
+static void
 fft_init(fftw_complex* const fft_in, fftw_complex* const fft_out, const int fft_size)
 {
     fft_plan = fftw_plan_dft_1d(fft_size, fft_in, fft_out, FFTW_FORWARD, FFTW_ESTIMATE);
@@ -199,12 +206,13 @@ calibrate(const char* const input_file_name, const int frame_size, const int hop
 
         printf("Calibrating key %c…\n", keys[keys_pressed[frame_id / 3][0]][keys_pressed[frame_id / 3][1]]);
 
+        hann(frame_buffer, frame_size);
         fft(fft_in, frame_buffer, fft_size, frame_size);
         cartesian_to_polar(amplitudes, phases, fft_out, fft_size);
 
         double peak_frequencies[2];
         get_peak_frequencies(peak_frequencies, amplitudes, sample_rate, fft_size);
-        printf("%.2lf Hz & %.2lf Hz.\n", peak_frequencies[1] < peak_frequencies[0] ? peak_frequencies[1] : peak_frequencies[0], peak_frequencies[1] < peak_frequencies[0] ? peak_frequencies[0] : peak_frequencies[1]);
+        printf("%d Hz & %d Hz.\n", peak_frequencies[1] < peak_frequencies[0] ? (int)peak_frequencies[1] : (int)peak_frequencies[0], peak_frequencies[1] < peak_frequencies[0] ? (int)peak_frequencies[0] : (int)peak_frequencies[1]);
 
         frame_id++;
     }
@@ -264,6 +272,7 @@ get_number(int* const number_size, const char* const input_file_name, const int 
             continue;
         }
 
+        hann(frame_buffer, frame_size);
         fft(fft_in, frame_buffer, fft_size, frame_size);
         cartesian_to_polar(amplitudes, phases, fft_out, fft_size);
 
