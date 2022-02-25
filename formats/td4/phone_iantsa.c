@@ -8,18 +8,16 @@
 
 #include "gnuplot_i.h"
 
-#define VERBOSE false
-#define PLOT true
+#define PLOT false
 
-#define FRAME_SIZE 8820 // 2867 // 8820 // 158760
-#define HOP_SIZE  1024 // 2867 // 2867 // 4410 // 1024
-#define FFT_SIZE FRAME_SIZE
+#define FRAME_SIZE 2867 // 8820 // 158760
+#define HOP_SIZE  2867 // 2867 // 4410 // 1024
 
 static gnuplot_ctrl* h; // Plot graph.
 static fftw_plan plan; // FFT plan.
 
-// static int c_tab[12][2]; // Correspondance table
 
+// Correspondance table.
 static double line[4] = {697., 770., 852., 941.};
 static double col[3] = {1209., 1336., 1477.};
 
@@ -115,9 +113,9 @@ read_samples(SNDFILE* infile, double* buffer, int channels)
  * @param phs The phase signal.
  */
 static void
-cartesian_to_polar(double complex S[FFT_SIZE], double amp[FFT_SIZE], double phs[FFT_SIZE])
+cartesian_to_polar(double complex S[FRAME_SIZE], double amp[FRAME_SIZE], double phs[FRAME_SIZE])
 {
-    for (int n = 0; n < FFT_SIZE; n++) {
+    for (int n = 0; n < FRAME_SIZE; n++) {
         amp[n] = cabs(S[n]);
         phs[n] = carg(S[n]);
     }
@@ -130,9 +128,9 @@ cartesian_to_polar(double complex S[FFT_SIZE], double amp[FFT_SIZE], double phs[
  * @param data_out The complex signal after FFT.
  */
 static void
-fft_init(fftw_complex data_in[FFT_SIZE], fftw_complex data_out[FFT_SIZE])
+fft_init(fftw_complex data_in[FRAME_SIZE], fftw_complex data_out[FRAME_SIZE])
 {
-    plan = fftw_plan_dft_1d(FFT_SIZE, data_in, data_out, FFTW_FORWARD, FFTW_ESTIMATE);
+    plan = fftw_plan_dft_1d(FRAME_SIZE, data_in, data_out, FFTW_FORWARD, FFTW_ESTIMATE);
 }
 
 /**
@@ -142,9 +140,9 @@ fft_init(fftw_complex data_in[FFT_SIZE], fftw_complex data_out[FFT_SIZE])
  * @param data_in The pre FFT buffer.
  */
 static void
-fft(double s[FFT_SIZE], fftw_complex data_in[FFT_SIZE])
+fft(double s[FRAME_SIZE], fftw_complex data_in[FRAME_SIZE])
 {
-    for (int i = 0; i < FFT_SIZE; i++)
+    for (int i = 0; i < FRAME_SIZE; i++)
         data_in[i] = s[i];
 
     fftw_execute(plan);
@@ -166,10 +164,10 @@ fft_exit()
  * @param amp 
  */
 static void
-display_nb_peaks(double amp[FFT_SIZE])
+display_nb_peaks(double amp[FRAME_SIZE])
 {
     int n_peaks = 0;
-    for (int i = 1; i < FFT_SIZE - 1; i++)
+    for (int i = 1; i < FRAME_SIZE - 1; i++)
         if (amp[i] >= amp[i-1] && amp[i] > amp[i+1])
             n_peaks++;
 
@@ -186,38 +184,13 @@ display_nb_peaks(double amp[FFT_SIZE])
  * @return The peak frequency computed.
  */
 static double
-parabolic_interpolation(double amp[FFT_SIZE], int sample, int SAMPLE_RATE)
+parabolic_interpolation(double amp[FRAME_SIZE], int sample, int SAMPLE_RATE)
 {
     double al = 20 * log(amp[sample - 1]);
     double ac = 20 * log(amp[sample]);
     double ar = 20 * log(amp[sample + 1]);
     double delta = .5 * (al - ar) / (al - 2 * ac + ar);
-    return (sample + delta) * SAMPLE_RATE / FFT_SIZE;
-}
-
-/**
- * @brief Retrieves sample index of the 2 local maxima.
- * Note: first and last sample cannot be local maxima.
- * 
- * @param amp 
- * @param peak1_sample
- * @param peak2_sample
- */
-static void
-retrieve_2_peaks(double amp[FFT_SIZE], int* peak1_sample, int* peak2_sample/*, int nb, int SAMPLE_RATE*/)
-{
-    *peak1_sample = 0, *peak2_sample = 0;
-    for (int i = 1; i < FFT_SIZE/2 - 1; i++)
-        if (amp[i] >= amp[i-1] && amp[i] > amp[i+1])
-        {
-            if (amp[i] > amp[*peak1_sample])
-            {
-                *peak2_sample = *peak1_sample;
-                *peak1_sample = i;
-            } 
-            else if (amp[i] > amp[*peak2_sample])
-                *peak2_sample = i;
-        }
+    return (sample + delta) * SAMPLE_RATE / FRAME_SIZE;
 }
 
 /**
@@ -230,10 +203,10 @@ retrieve_2_peaks(double amp[FFT_SIZE], int* peak1_sample, int* peak2_sample/*, i
  * @param SAMPLE_RATE
  */
 static void
-retrieve_2_freq(double amp[FFT_SIZE], double* freq1, double* freq2, int SAMPLE_RATE)
+retrieve_2_freq(double amp[FRAME_SIZE], double* freq1, double* freq2, int SAMPLE_RATE)
 {
     int peak1_sample = 0, peak2_sample = 0;
-    for (int i = 1; i < FFT_SIZE/2 - 1; i++)
+    for (int i = 1; i < FRAME_SIZE/2 - 1; i++)
         if (amp[i] >= amp[i-1] && amp[i] > amp[i+1])
         {
             if (amp[i] > amp[peak1_sample])
@@ -245,25 +218,13 @@ retrieve_2_freq(double amp[FFT_SIZE], double* freq1, double* freq2, int SAMPLE_R
                 peak2_sample = i;
         }
 
+    // Without parabolic interpolation.
+    // *freq1 = peak1_sample * SAMPLE_RATE / FRAME_SIZE;
+    // *freq2 = peak2_sample * SAMPLE_RATE / FRAME_SIZE;
+
+    // With parabolic interpolation.
     *freq1 = round(parabolic_interpolation(amp, peak1_sample, SAMPLE_RATE));
     *freq2 = round(parabolic_interpolation(amp, peak2_sample, SAMPLE_RATE));
-}
-
-/**
- * @brief Fills correspondance table for number nb.
- * 
- * @param sample1
- * @param sample2
- * @param nb
- * @param SAMPLE_RATE
- */
-static void
-fill_c_tab(double amp[FFT_SIZE], int sample1, int sample2, int nb, int SAMPLE_RATE)
-{
-    // c_tab[nb][0] = sample1 * SAMPLE_RATE / FFT_SIZE;
-    // c_tab[nb][1] = sample2 * SAMPLE_RATE / FFT_SIZE;
-    c_tab[nb][0] = round(parabolic_interpolation(amp, sample1, SAMPLE_RATE));
-    c_tab[nb][1] = round(parabolic_interpolation(amp, sample2, SAMPLE_RATE));
 }
 
 /**
@@ -325,17 +286,19 @@ nearest_freq_index(double freq, double prec)
  * @return The char corresponding.
  */
 static char
-decode(double freq1, double freq2, double prec)
+decode(double freq1, double freq2)
 {
-    int i1 = nearest_freq_index(freq1, 2);
-    int i2 = nearest_freq_index(freq2, 2);
+    // Only works if the exact values are found
     if (freq1 < 1000)
-        return c_tab[i1][i2];
-    return c_tab[i2][i1];
+        return c_tab[indexOf(line, 4, freq1)][indexOf(col, 3, freq2)];
+    return c_tab[indexOf(line, 4, freq2)][indexOf(col, 3, freq1)];
 
+    // Works either way thanks to interval acceptance
+    // int i1 = nearest_freq_index(freq1, 12);
+    // int i2 = nearest_freq_index(freq2, 12);
     // if (freq1 < 1000)
-    //     return c_tab[indexOf(line, 4, freq1)][indexOf(col, 3, freq2)];
-    // return c_tab[indexOf(line, 4, freq2)][indexOf(col, 3, freq1)];
+    //     return c_tab[i1][i2];
+    // return c_tab[i2][i1];
 }
 
 /**
@@ -406,17 +369,13 @@ int main(int argc, char** argv)
     printf("Channels: %d.\n", NUM_CHANNELS);
     printf("Size: %d.\n", SIZE);
 
-    printf("Frame Size: %d.\n", FRAME_SIZE);
-    printf("Hop Size: %d.\n", HOP_SIZE);
-    printf("FFT Size: %d.\n", FFT_SIZE);
-
     // Initialize FFT.
-    double fft_buffer[FFT_SIZE], amp[FFT_SIZE], phs[FFT_SIZE];
-    fftw_complex data_in[FFT_SIZE], data_out[FFT_SIZE];
+    double amp[FRAME_SIZE], phs[FRAME_SIZE];
+    fftw_complex data_in[FRAME_SIZE], data_out[FRAME_SIZE];
     fft_init(data_in, data_out);
 
-    // bool is_prev_silence = false;
-    // char prev_key = ' ';
+    bool is_prev_silence = false;
+    char prev_key = ' ';
 
     // Loop over each frame.
     while (read_samples(infile, new_buffer, sfinfo.channels) == 1) {
@@ -425,28 +384,22 @@ int main(int argc, char** argv)
         // Fill frame buffer (original signal during the frame).
         fill_buffer(buffer, new_buffer);
 
-        // Fill FFT buffer (frame buffer and zeros if necessary).
-        // for (int i = 0; i < FFT_SIZE; i++) {
-        //     // fft_buffer[i] = i < FRAME_SIZE ? buffer[i] * hann(i) : 0.; // For using w/ Hann.
-        //     fft_buffer[i] = i < FRAME_SIZE ? buffer[i] : 0.;
-        // }
-
         // Hann window.
-        // for (int i = 0; i < FFT_SIZE; i++)
-        //     buffer[i] *= hann(i);
+        for (int i = 0; i < FRAME_SIZE; i++)
+            buffer[i] *= hann(i);
 
         // Execute FFT.
         fft(buffer, data_in);
         cartesian_to_polar(data_out, amp, phs);
 
         // Normalize amplitude signal (values between 0 and 1).
-        // for (int i = 0; i < FFT_SIZE; i++)
+        // for (int i = 0; i < FRAME_SIZE; i++)
         //     amp[i] *= 2. / FRAME_SIZE;
 
         // Retrieve maximum amplitude, and position associated.
         double max_amp = amp[0];
         int max_amp_i = 0;
-        for (int i = 1; i < FFT_SIZE / 2; i++) { // No need to go further, the other half is symetrical.
+        for (int i = 1; i < FRAME_SIZE / 2; i++) { // No need to go further, the other half is symetrical.
             if (max_amp < amp[i]) {
                 max_amp = amp[i];
                 max_amp_i = i;
@@ -454,57 +407,35 @@ int main(int argc, char** argv)
         }
 
         // Check if signal is not null.
-        // double threshold = 0.005;
-        if (max_amp == 0 /*|| energy(buffer) < threshold*/) {
+        double threshold = 0.005;
+        if (max_amp == 0 || energy(buffer) < threshold) {
             // printf("Null frame, skipping…\n");
-            // is_prev_silence = true;
+            is_prev_silence = true;
             nb_frames++;
             continue;
         }
 
-        // if (VERBOSE)
-        //     printf("Max amplitude: %lf.\n", max_amp);
-
         // Define FFT frequency precision.
-        // double freq_prec = SAMPLE_RATE / (2. * FFT_SIZE);
+        // double freq_prec = SAMPLE_RATE / (2. * FRAME_SIZE);
         // printf("Precision: %lf\n", freq_prec);
 
-        // // Compute maximum amplitude frequency.
-        // double max_amp_freq = max_amp_i * SAMPLE_RATE / FFT_SIZE;
-        // printf("Max amplitude frequency: %lf (± %lf) Hz.\n", max_amp_freq, freq_prec);
-
-        // // Estimate peak frequency (parabolic interpolation).
-        // double al = 20 * log(amp[max_amp_i - 1]);
-        // double ac = 20 * log(amp[max_amp_i]);
-        // double ar = 20 * log(amp[max_amp_i + 1]);
-        // double delta = .5 * (al - ar) / (al - 2 * ac + ar);
-        // double peak_freq = (max_amp_i + delta) * SAMPLE_RATE / FFT_SIZE;
-        // printf("Estimated peak frequency: %lf Hz.\n", peak_freq);
-
+        // Check number of peaks in current frame.
         // display_nb_peaks(amp);
 
-        // Fill correspondance table (use when param is telbase.wav).
-        // int nb, sample1, sample2;
-        // if (nb_frames % 3 == 0)
-        // {
-        //     nb = nb_frames / 3;
-        //     retrieve_2_peaks(amp, &sample1, &sample2/*nb, SAMPLE_RATE*/);
-        //     fill_c_tab(amp, sample1, sample2, nb, SAMPLE_RATE);
-        // }
-
-        // double freq1, freq2;
-        // retrieve_2_freq(amp, &freq1, &freq2, SAMPLE_RATE);
-        // // printf("%lf, %lf\n", freq1, freq2);
-        // char key = decode(freq1, freq2, freq_prec);
+        // Decode pressed key in current frame.
+        double freq1, freq2;
+        retrieve_2_freq(amp, &freq1, &freq2, SAMPLE_RATE);
+        // printf("%lf, %lf\n", freq1, freq2);
+        char key = decode(freq1, freq2);
 
         // // Check if we are analysing the same key as previous frame.
-        // if (prev_key == key)
-        // {
-        //     if (is_prev_silence)
-        //         printf("%c", key);
+        if (prev_key == key)
+        {
+            if (is_prev_silence)
+                printf("%c", key);
                 
-        // } else
-        //     printf("%c", key);
+        } else
+            printf("%c", key);
 
         // Display frame energy.
         // printf("%lf\n", energy(buffer));
@@ -520,17 +451,11 @@ int main(int argc, char** argv)
         // Increase frame id for next frame.
         nb_frames++;
 
-        // is_prev_silence = false;
-        // prev_key = key;
+        is_prev_silence = false;
+        prev_key = key;
     }
 
-    // printf("\n");
-
-    // Displays correspondance table values.
-    // for (int i = 0; i < 10; i++)
-    //     printf("%d = (%d, %d)\n", (i+1)%10, c_tab[i][0], c_tab[i][1]);
-    // printf("* = (%d, %d)\n", c_tab[10][0], c_tab[10][1]);
-    // printf("# = (%d, %d)\n", c_tab[11][0], c_tab[11][1]);
+    printf("\n");
 
     // Shut down FFT, close file and exit program.
     fft_exit();

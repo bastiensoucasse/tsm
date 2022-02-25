@@ -7,8 +7,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define FRAME_SIZE 2866
-#define HOP_SIZE 2866
+#define FRAME_SIZE 2646
+#define HOP_SIZE 2646
 
 #define CALIBRATION_FRAME_SIZE 8820
 #define CALIBRATION_HOP_SIZE 4410

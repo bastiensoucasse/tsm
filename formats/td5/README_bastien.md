@@ -3,22 +3,22 @@ Bastien Soucasse
 # Watermarking – TD 5
 
 Fréquence d'échantillonnage :\
-$F_e = 44100 \; \text{Hz}$
+**F_e = 44100 Hz**
 
 Durée :\
-$t = 0.05 \; \text{s}$
+**t = 0.05 s**
 
 Résolution temporelle :\
-$n = F_e t = 2205 \; \text{échantillons}$
+**n = F_e t = 2205 échantillons**
 
 Résolution fréquentielle :\
-$\Delta f = \frac{F_e}{n} = 20 \; \text{Hz}$
+**Df = F_e / n = 20 Hz**
 
 Précision fréquntielle :\
-$f_{\text{prec}} = \frac{\Delta f}{2} = 10 \; \text{Hz}$
+**f_prec = Df / 2 = 10 Hz**
 
 Précision temporelle :\
-$t_{\text{prec}} = \frac{t}{2} = 0.025\; \text{s}$
+**t_prec = t / 2 = 0.025 s**
 
 Après analyse, il apparaît que les fréquences contenant des évènements ont une amplitude supérieure à 3. Nous pouvons donc les reconnaître ainsi.
 

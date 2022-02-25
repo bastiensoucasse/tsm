@@ -9,13 +9,13 @@ Bastien Soucasse
 On cherche à récupérer les fréquences de chaque touche grâce au fichier `telbase.wav`. On doit travailler sur une trame où il n’y a qu’une seule touche à la fois pour ne pas mélanger les fréquences analysées. La durée minimale de pression d’une touche étant 0.2 s, on choisit une durée de trame équivalente.
 
 Durée :\
-$t = 0.2 \; \text{s}$
+**t = 0.2 s**
 
 Résolution temporelle :\
-$n = F_e t = 8820 \; \text{échantillons}$
+**n = F_e t = 8820 échantillons**
 
 Résolution fréquentielle :\
-$\Delta f = \frac{F_e}{n} = 5 \; \text{Hz}$
+**Df = F_e / n = 5 Hz**
 
 Il n’y a pas de précautions à prendre. On sait que les fréquences sont éloignées de plus de 5 Hz entre elles.
 
@@ -24,10 +24,10 @@ Il n’y a pas de précautions à prendre. On sait que les fréquences sont élo
 Pour observer tous le spectre, on regarde toute la durée du son. Il y a 12 touches, pressées pendant 0.2 s suivi d’une pause de 0.1 s pour chacune. On doit donc lancer l’analyse avec les paramètres suivants.
 
 Durée :\
-$T = 12 * (0.2 + 0.1) = 3.6 \; \text{s}$
+**T = 12 * (0.2 + 0.1) = 3.6 s**
 
 Résolution temporelle :\
-$N = F_e T = 158760 \; \text{échantillons}$
+**N = F_e T = 158760 échantillons**
 
 ![Spectre du signal complet](full_signal_spectrum.png)
 
@@ -37,7 +37,7 @@ En écoutant les sons de chaque touche, on peut comprendre qu’une fréquence e
 
 ### Question 3
 
-En lançant l’analyse pour chaque trame de 0.2 s, on trouve au minimum 2 pics, et 3 au maximum.
+En lançant l’analyse pour chaque trame de 0.2 s, on trouve au minimum 2 pics, et 4 au maximum.
 
 En effet, les trames contenant 2 pics sont celles dont une seule touche est préssée durant toute la trame. Alors que s’il y a deux touches préssées durant la trame (fin d’une touche au début de la trame, et début d’une autre à la fin), il y a alors les fréquences des deux touches qui se mélangent.
 
@@ -54,7 +54,7 @@ Ayant résolu le problème de superposition de signaux, on devrait stocker deux 
 ### Question 6
 
 Précision :\
-$f_{\text{prec}} = \frac{\Delta f}{2} = 2.5 \; \text{Hz}$
+**f_prec = Df / 2 = 2.5 Hz**
 
 Pour améliorer cette précision, on met en place une interpolation parabolique, cela va permettre d’estimer une valeur plus proche de la fréquence exacte du pic.
 
@@ -69,10 +69,10 @@ En analysant les fréquences de chaque touche, on obtient un couple qui correspo
 Une fois cette calibration faite, on peut analyser le fichier `telA.wav` « à la main ».
 
 Durée :\
-$t = 0.065 \; \text{s}$
+**t = 0.06 s**
 
 Représentation temporelle :\
-$n = F_e t = 2866 \; \text{échantillons}$
+**n = F_e t = 2646 échantillons**
 
 En analysant chaque frame, on se rend compte que les numéros apparaissent plusieurs fois (plusieurs frames sont sur la même touche), mais qu'ils sont bien séparés par des frames « inutiles ».
 
@@ -80,7 +80,7 @@ On se rend compte que le numéro composé ici est donc 0556846500.
 
 ## Détection de touches
 
-En analysant les énergies de chaque frame, on décide de garder les frames dont l'énergie est supérieure à 0.00001.
+En analysant les énergies de chaque frame, on décide de garder les frames dont l'énergie est supérieure à 0.01.
 
 ## Analyse de numéros
 
