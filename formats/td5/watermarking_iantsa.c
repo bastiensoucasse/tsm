@@ -19,21 +19,9 @@
 static gnuplot_ctrl* h; // Plot graph.
 static fftw_plan plan; // FFT plan.
 
-
 // Correspondance table.
-static char event_name[3] = {'A', 'B', 'C'};
-static double event_freq[3] = {19126., 19584., 20032.};
-
-/**
- * @brief Prints usage on the console.
- *
- * @param progname The program name entered in command line.
- */
-static void
-usage(char* progname)
-{
-    fprintf(stderr, "Usage: %s <input file>.\n", progname);
-}
+static char event_name[3] = { 'A', 'B', 'C' };
+static double event_freq[3] = { 19126., 19584., 20032. };
 
 /**
  * @brief Fills the frame buffer from the hop buffer.
@@ -165,11 +153,11 @@ hann(double n)
 
 /**
  * @brief Estimates peak frequency from previous and next samples values.
- * 
+ *
  * @param amp
  * @param sample
  * @param SAMPLE_RATE
- * 
+ *
  * @return The peak frequency computed.
  */
 static double
@@ -186,88 +174,71 @@ parabolic_interpolation(double amp[FRAME_SIZE], int sample, int SAMPLE_RATE)
  * @brief Checks if there is a peak above 18000 Hz in a portion of the signal.
  * If so, return the value of the first one found,
  * and put the sample index in parameter sample_index.
- * 
- * @param amp 
+ *
+ * @param amp
  * @param SAMPLE_RATE
  * @param sample_index
- * 
+ *
  * @return Frequence if found.
  *         -1 otherwhise.
  */
 static double
-inaudible_peak(double amp[FRAME_SIZE], int SAMPLE_RATE, int *sample_index)
+inaudible_peak(double amp[FRAME_SIZE], int SAMPLE_RATE, int* sample_index)
 {
     double freq;
-    for (int i = 0; i < FRAME_SIZE/2; i++)
+    for (int i = 0; i < FRAME_SIZE / 2; i++)
 
         // Check if there is a peak
-        if (amp[i] >= amp[i-1] && amp[i] > amp[i+1])
-        {
+        if (amp[i] >= amp[i - 1] && amp[i] > amp[i + 1]) {
             freq = round(parabolic_interpolation(amp, i, SAMPLE_RATE));
 
             // Check if the frequence is inaudible
-            if (freq > 18000. && amp[i] > AMP_THRESHOLD) 
-            {
+            if (freq > 18000. && amp[i] > AMP_THRESHOLD) {
                 // printf("amplitude: %lf\n", amp[i]);
                 *sample_index = i;
                 return freq;
-            }   
+            }
         }
     return -1;
 }
 
 /**
- * @brief Checks if freq corresponds to an existing event. 
+ * @brief Checks if freq corresponds to an existing event.
  * If so, puts the event name in event parameter and computes time code.
- * 
+ *
  * @param freq
  * @param sample_index
  * @param nb_frames
  * @param event
  * @param time_code
- * 
+ *
  * @return True if it exists a corresponding event
  *         False otherwise.
  */
 static bool
-is_watermark(double freq, int sample_index, int nb_frames, int SAMPLE_RATE, char *event, double *time_code)
+is_watermark(double freq, int sample_index, int nb_frames, int SAMPLE_RATE, char* event, double* time_code)
 {
     for (int i = 0; i < 3; i++)
-        if (event_freq[i] == freq)
-        {
+        if (event_freq[i] == freq) {
             *event = event_name[i];
-            *time_code = EVENT_TIME * nb_frames + (sample_index/SAMPLE_RATE);
+            *time_code = EVENT_TIME * nb_frames + (sample_index / SAMPLE_RATE);
             return true;
         }
     return false;
 }
 
-
-int main(int argc, char** argv)
+static void
+watermarking(char* infilename)
 {
     // Init file accessing.
-    char *progname, *infilename;
     SNDFILE* infile = NULL;
     SF_INFO sfinfo;
-
-    // Retrieve program name.
-    progname = strrchr(argv[0], '/');
-    progname = progname ? progname + 1 : argv[0];
-
-    // Check correct usage.
-    if (argc != 2) {
-        usage(progname);
-        return 1;
-    }
-
-    // Retrieve input file name.
-    infilename = argv[1];
 
     // Open input file.
     if ((infile = sf_open(infilename, SFM_READ, &sfinfo)) == NULL) {
         fprintf(stderr, "Not able to open input file %s.\n", infilename);
         puts(sf_strerror(NULL));
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 
     // Init file reading.
@@ -285,14 +256,14 @@ int main(int argc, char** argv)
             fill_buffer(buffer, new_buffer);
         else {
             fprintf(stderr, "Not enough samples.\n");
-            return EXIT_FAILURE;
+            exit(EXIT_FAILURE);
         }
     }
 
     // Retrieve file info.
     const unsigned int SAMPLE_RATE = sfinfo.samplerate; // 44100 Hz.
     const unsigned char NUM_CHANNELS = sfinfo.channels; // 1 (mono).
-    const unsigned int SIZE = (int)sfinfo.frames; 
+    const unsigned int SIZE = (int)sfinfo.frames;
 
     // Display file info.
     printf("Sample Rate: %d.\n", SAMPLE_RATE);
@@ -358,9 +329,24 @@ int main(int argc, char** argv)
         nb_frames++;
     }
 
-
     // Shut down FFT, close file and exit program.
     fft_exit();
     sf_close(infile);
+}
+
+int main(int argc, char** argv)
+{
+    printf("--- \"sounds/flux1.wav\" ---\n");
+    watermarking("sounds/flux1.wav");
+
+    printf("\n--- \"sounds/flux2.wav\" ---\n");
+    watermarking("sounds/flux2.wav");
+
+    printf("\n--- \"sounds/flux3.wav\" ---\n");
+    watermarking("sounds/flux3.wav");
+
+    printf("\n--- \"sounds/flux4.wav\" ---\n");
+    watermarking("sounds/flux4.wav");
+
     return EXIT_SUCCESS;
 }
