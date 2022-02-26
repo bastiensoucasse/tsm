@@ -11,7 +11,7 @@
 #define PLOT false
 
 #define FRAME_SIZE 2867 // 8820 // 158760
-#define HOP_SIZE  2867 // 2867 // 4410 // 1024
+#define HOP_SIZE 2867 // 4410 // 1024
 
 static gnuplot_ctrl* h; // Plot graph.
 static fftw_plan plan; // FFT plan.
@@ -302,7 +302,9 @@ decode(double freq1, double freq2)
 }
 
 /**
- * @brief
+ * @brief Computes energy of the signal on a portion in buffer.
+ * 
+ * @param buffer
  */
 static double
 energy(double buffer[FRAME_SIZE])
