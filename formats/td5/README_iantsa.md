@@ -8,17 +8,20 @@ L'idée est d'établir un seuil d'amplitude, au-dessous duquel la fréquence ne 
 
 On remarque que 3 amplitudes sortent du lot: environ **51**, **53** et **49**. On peut donc par exemple mettre le seuil à **40**.
 
-Ces amplitudes correspondent respectivement aux fréquences **19126**, **19584** et **20032 Hz**. Comme on connaît l'ordre d'apparition pour le signal sonore `flux1.wav`, on peut en déduire que ce sont respectivement les fréquences des évènements A, B et C.
+Ces amplitudes correspondent respectivement aux fréquences **19126**, **19584** et **20032 Hz**. Comme on connaît l'ordre d'apparition des évènements dans le signal sonore `flux1.wav`, on peut en déduire que ce sont respectivement les fréquences des évènements A, B et C.
 
-durée d'un signal de clavier: d = 0.05 s \
-fréquence d'échantillonnage: Fech = 44100 Hz \
-**FRAME_SIZE** = d * Fech = 0.05 * 44100 = **2205** \
+On sait que:
+
+durée d'un signal de clavier: EVENT_TIME = 0.05 s \
+fréquence d'échantillonnage: SAMPLE_RATE = 44100 Hz
+
+Donc:
+
+**FRAME_SIZE** = EVENT_TIME * SAMPLE_RATE = 0.05 * 44100 = **2205** \
 **HOP_SIZE** = **2205**
 
-précision fréquentielle: **res_freq** = Fech / (2*FRAME_SIZE) = **10 Hz**
-Cela paraît être une précision raisonnable, étant donné qu'on va travailler sur de grandes fréquences.
-
-TODO: Expliquer l'équilibre trouvé entre la précision d'analyse de la fréquence et la durée choisie pour l'ana- lyse. (lol)
+précision fréquentielle: **res_freq** = Fech / (2*FRAME_SIZE) = **10 Hz** \
+Cela paraît être une précision raisonnable, étant donné que les fréquences "témoins", sont espacées d'au moins 448 Hz.
 
 
 ## Détection d'évènements

@@ -14,6 +14,7 @@
 #define HOP_SIZE 2205
 
 #define AMP_THRESHOLD 40.
+#define EVENT_TIME 0.05
 
 static gnuplot_ctrl* h; // Plot graph.
 static fftw_plan plan; // FFT plan.
@@ -235,7 +236,7 @@ is_watermark(double freq, int sample_index, int nb_frames, int SAMPLE_RATE, char
         if (event_freq[i] == freq)
         {
             *event = event_name[i];
-            *time_code = ((double) FRAME_SIZE/SAMPLE_RATE) * nb_frames + (sample_index/SAMPLE_RATE);
+            *time_code = EVENT_TIME * nb_frames + (sample_index/SAMPLE_RATE);
             return true;
         }
     return false;
