@@ -112,10 +112,10 @@ get_event_type(const double event_frequency)
 static int
 is_frame_event(const double* const amplitudes, const int sample_rate, const int fft_size)
 {
-    const double threshold = 3.;
+    const int threshold = 50;
 
     for (int sample = 1; sample < fft_size / 2 - 1; sample++)
-        if (amplitudes[sample] >= amplitudes[sample - 1] && amplitudes[sample] > amplitudes[sample + 1] && amplitudes[sample] > threshold) {
+        if (amplitudes[sample] >= amplitudes[sample - 1] && amplitudes[sample] > amplitudes[sample + 1] && (int)round(amplitudes[sample]) >= threshold) {
             const double left = 20 * log(amplitudes[sample - 1]);
             const double current = 20 * log(amplitudes[sample]);
             const double right = 20 * log(amplitudes[sample + 1]);
