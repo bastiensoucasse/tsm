@@ -7,15 +7,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define FRAME_SIZE 2205
-#define HOP_SIZE 2205
+#define FRAME_SIZE 1024
+#define HOP_SIZE 1024
 
-#define EVENT_FREQUENCIES 18000
-
-static const char* event_types[3] = { "Event A", "Event B", "Event C" };
-static const int event_frequencies[3] = { 19122, 19581, 20034 };
-
-static fftw_plan fft_plan;
+// static fftw_plan fft_plan;
 
 static bool
 read_samples(double* const hop_buffer, SNDFILE* const input_file, const int hop_size, const char channels)
@@ -65,82 +60,77 @@ frame_is_useful(const double* const frame_buffer, const int frame_size)
     return energy > threshold;
 }
 
-static void
-hann(double* const frame_buffer, const int frame_size)
-{
-    for (int sample = 0; sample < frame_size; sample++)
-        frame_buffer[sample] *= .5 - .5 * cos(2. * M_PI * sample / FRAME_SIZE);
-}
+// static void
+// hann(double* const frame_buffer, const int frame_size)
+// {
+//     for (int sample = 0; sample < frame_size; sample++)
+//         frame_buffer[sample] *= .5 - .5 * cos(2. * M_PI * sample / frame_size);
+// }
 
-static void
-fft_init(fftw_complex* const fft_in, fftw_complex* const fft_out, const int fft_size)
-{
-    fft_plan = fftw_plan_dft_1d(fft_size, fft_in, fft_out, FFTW_FORWARD, FFTW_ESTIMATE);
-}
+// static void
+// fft_init(fftw_complex* const fft_in, fftw_complex* const fft_out, const int fft_size)
+// {
+//     fft_plan = fftw_plan_dft_1d(fft_size, fft_in, fft_out, FFTW_FORWARD, FFTW_ESTIMATE);
+// }
 
-static void
-fft(fftw_complex* const fft_in, const double* const signal, const int fft_size, const int frame_size)
-{
-    for (int sample = 0; sample < fft_size; sample++)
-        fft_in[sample] = sample < frame_size ? signal[sample] : 0.;
+// static void
+// fft(fftw_complex* const fft_in, const double* const signal, const int fft_size, const int frame_size)
+// {
+//     for (int sample = 0; sample < fft_size; sample++)
+//         fft_in[sample] = sample < frame_size ? signal[sample] : 0.;
 
-    fftw_execute(fft_plan);
-}
+//     fftw_execute(fft_plan);
+// }
 
-static void
-cartesian_to_polar(double* const amplitudes, double* const phases, const double complex* const fft_out, const int fft_size)
+// static void
+// cartesian_to_polar(double* const amplitudes, double* const phases, const double complex* const fft_out, const int fft_size)
+// {
+//     for (int sample = 0; sample < fft_size; sample++) {
+//         amplitudes[sample] = cabs(fft_out[sample]);
+//         phases[sample] = carg(fft_out[sample]);
+//     }
+// }
+
+// static void
+// fft_exit()
+// {
+//     fftw_destroy_plan(fft_plan);
+// }
+
+static int
+get_frequency(const double* const frame_buffer, const int frame_size, const double sample_rate)
 {
-    for (int sample = 0; sample < fft_size; sample++) {
-        amplitudes[sample] = cabs(fft_out[sample]);
-        phases[sample] = carg(fft_out[sample]);
+    double max_amp_1 = 0, max_amp_2 = 0;
+    double max_amp_sample_1 = 0, max_amp_sample_2 = 0;
+
+    for (int sample = 0; sample < frame_size; sample++) {
+        if (max_amp_1 < frame_buffer[sample]) {
+            max_amp_2 = max_amp_1;
+            max_amp_sample_2 = max_amp_sample_1;
+            max_amp_1 = frame_buffer[sample];
+            max_amp_sample_1 = sample;
+        } else if (max_amp_2 < frame_buffer[sample]) {
+            max_amp_2 = frame_buffer[sample];
+            max_amp_sample_2 = sample;
+        }
     }
+
+    return max_amp_sample_2;
 }
 
 static int
-get_event_type(const double event_frequency)
+get_pitch(const double frequency)
 {
-    double delta = fabs(event_frequencies[0] - event_frequency);
-    int type = 0;
-    for (int i = 1; i < 3; i++)
-        if (delta > fabs(event_frequencies[i] - event_frequency)) {
-            delta = fabs(event_frequencies[i] - event_frequency);
-            type = i;
-        }
-    return type;
+    const int H0 = 57, F0 = 440;
+    return ((int)round(H0 + 12 * log2(frequency / F0))) % 12;
 }
 
-static int
-is_frame_event(const double* const amplitudes, const int sample_rate, const int fft_size)
-{
-    const int threshold = 50;
-
-    for (int sample = 1; sample < fft_size / 2 - 1; sample++)
-        if (amplitudes[sample] >= amplitudes[sample - 1] && amplitudes[sample] > amplitudes[sample + 1] && (int)round(amplitudes[sample]) >= threshold) {
-            const double left = 20 * log(amplitudes[sample - 1]);
-            const double current = 20 * log(amplitudes[sample]);
-            const double right = 20 * log(amplitudes[sample + 1]);
-            const double delta = .5 * (left - right) / (left - 2 * current + right);
-            const double frequency = (sample + delta) * sample_rate / fft_size;
-            if (frequency > EVENT_FREQUENCIES)
-                return get_event_type(frequency);
-        }
-
-    return -1;
-}
-
-static void
-fft_exit()
-{
-    fftw_destroy_plan(fft_plan);
-}
-
-static void
-handle_events(const char* const input_file_name, const int frame_size, const int hop_size)
+int main(const int argc, const char* const* const argv)
 {
     SNDFILE* input_file = NULL;
     SF_INFO input_info;
-    if ((input_file = sf_open(input_file_name, SFM_READ, &input_info)) == NULL) {
-        fprintf(stderr, "Not able to open input file %s.\n", input_file_name);
+    if ((input_file = sf_open(argv[1], SFM_READ, &input_info)) == NULL) {
+        fprintf(stderr, "Not able to open input file %s.\n", argv[1]);
         puts(sf_strerror(NULL));
         exit(EXIT_FAILURE);
     }
@@ -148,63 +138,63 @@ handle_events(const char* const input_file_name, const int frame_size, const int
     const double sample_rate = input_info.samplerate;
     const int channels = input_info.channels;
 
-    double hop_buffer[hop_size];
-    double frame_buffer[frame_size];
+    double hop_buffer[HOP_SIZE];
+    double frame_buffer[FRAME_SIZE];
 
-    for (int sample = 0; sample < frame_size / hop_size - 1; sample++) {
-        if (read_samples(hop_buffer, input_file, hop_size, channels))
-            fill_frame_buffer(frame_buffer, hop_buffer, frame_size, hop_size);
+    for (int sample = 0; sample < FRAME_SIZE / HOP_SIZE - 1; sample++) {
+        if (read_samples(hop_buffer, input_file, HOP_SIZE, channels))
+            fill_frame_buffer(frame_buffer, hop_buffer, FRAME_SIZE, HOP_SIZE);
         else {
             fprintf(stderr, "Not enough samples.\n");
             exit(EXIT_FAILURE);
         }
     }
 
-    int fft_size = frame_size;
-    fftw_complex fft_in[fft_size], fft_out[fft_size];
-    double amplitudes[fft_size], phases[fft_size];
-    fft_init(fft_in, fft_out, fft_size);
+    // int fft_size = FRAME_SIZE;
+    // fftw_complex fft_in[fft_size], fft_out[fft_size];
+    // double amplitudes[fft_size], phases[fft_size];
+    // fft_init(fft_in, fft_out, fft_size);
 
     int frame_id = 0;
-    while (read_samples(hop_buffer, input_file, hop_size, channels)) {
-        fill_frame_buffer(frame_buffer, hop_buffer, frame_size, hop_size);
+    while (read_samples(hop_buffer, input_file, HOP_SIZE, channels)) {
+        fill_frame_buffer(frame_buffer, hop_buffer, FRAME_SIZE, HOP_SIZE);
 
-        if (!frame_is_useful(frame_buffer, frame_size)) {
+        if (!frame_is_useful(frame_buffer, FRAME_SIZE)) {
             frame_id++;
             continue;
         }
 
-        hann(frame_buffer, frame_size);
-        fft(fft_in, frame_buffer, fft_size, frame_size);
-        cartesian_to_polar(amplitudes, phases, fft_out, fft_size);
+        // hann(frame_buffer, FRAME_SIZE);
+        // fft(fft_in, frame_buffer, fft_size, FRAME_SIZE);
+        // cartesian_to_polar(amplitudes, phases, fft_out, fft_size);
 
-        int event_type = is_frame_event(amplitudes, sample_rate, fft_size);
-        if (event_type >= 0) {
-            const double time = frame_id * frame_size / sample_rate;
-            const double time_precision = frame_size / (2 * sample_rate);
-            printf("  - %.2lf s (± %.3lf s): %s.\n", time, time_precision, event_types[event_type]);
-        }
+        // double max_amp = 0;
+        // double max_amp_freq = 0;
+        // for (int sample = 0; sample < fft_size / 2; sample++)
+        //     if (max_amp < amplitudes[sample]) {
+        //         max_amp = amplitudes[sample];
+        //         double left = 20 * log(amplitudes[sample - 1]);
+        //         double current = 20 * log(amplitudes[sample]);
+        //         double right = 20 * log(amplitudes[sample + 1]);
+        //         double delta = .5 * (left - right) / (left - 2 * current + right);
+        //         max_amp_freq = (sample + delta) * sample_rate / fft_size;
+        //     }
+
+        // printf("Max Amplitude Frequency: %.2lf.\n", max_amp_freq);
+
+        // int pitch = get_pitch(max_amp_freq);
+        // printf("Pitch: %d.\n", pitch);
+
+        int frequency = get_frequency(frame_buffer, FRAME_SIZE, sample_rate);
+        printf("New Max Amplitude Frequency: %d.\n", frequency);
+
+        int pitch = get_pitch(frequency);
+        printf("New Pitch: %d.\n", pitch);
 
         frame_id++;
     }
 
-    fft_exit();
+    // fft_exit();
     sf_close(input_file);
-}
-
-int main(const int argc, const char* const* const argv)
-{
-    printf("Events in sounds/flux1.wav:\n");
-    handle_events("sounds/flux1.wav", FRAME_SIZE, HOP_SIZE);
-
-    printf("\nEvents in sounds/flux2.wav:\n");
-    handle_events("sounds/flux2.wav", FRAME_SIZE, HOP_SIZE);
-
-    printf("\nEvents in sounds/flux3.wav:\n");
-    handle_events("sounds/flux3.wav", FRAME_SIZE, HOP_SIZE);
-
-    printf("\nEvents in sounds/flux4.wav:\n");
-    handle_events("sounds/flux4.wav", FRAME_SIZE, HOP_SIZE);
-
     return EXIT_SUCCESS;
 }
