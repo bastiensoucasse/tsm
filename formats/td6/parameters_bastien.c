@@ -1,16 +1,28 @@
 #include <complex.h>
 #include <fftw3.h>
-#include <float.h>
 #include <math.h>
 #include <sndfile.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "gnuplot_i.h"
+
+#define PLOT true
+
 #define FRAME_SIZE 1024
 #define HOP_SIZE 1024
+#define ENERGY_THRESHOLD .015
 
 // static fftw_plan fft_plan;
+static gnuplot_ctrl* plot;
+
+static void
+usage(const char* const progname)
+{
+    fprintf(stderr, "Usage: %s <file>.\n", progname);
+    exit(EXIT_FAILURE);
+}
 
 static bool
 read_samples(double* const hop_buffer, SNDFILE* const input_file, const int hop_size, const char channels)
@@ -47,25 +59,27 @@ fill_frame_buffer(double* const frame_buffer, const double* const hop_buffer, co
         frame_buffer[frame_size - hop_size + sample] = hop_buffer[sample];
 }
 
-static bool
-frame_is_useful(const double* const frame_buffer, const int frame_size)
+static double
+get_energy(const double* const frame_buffer, const int frame_size)
 {
-    const double threshold = .00001;
     double energy = 0.;
-
     for (int sample = 0; sample < frame_size; sample++)
-        energy += pow(frame_buffer[sample], 2);
-    energy *= 1. / frame_size;
-
-    return energy > threshold;
+        energy += pow(frame_buffer[sample], 2) / frame_size;
+    return energy;
 }
 
-// static void
-// hann(double* const frame_buffer, const int frame_size)
-// {
-//     for (int sample = 0; sample < frame_size; sample++)
-//         frame_buffer[sample] *= .5 - .5 * cos(2. * M_PI * sample / frame_size);
-// }
+static bool
+frame_is_useful(const double frame_energy)
+{
+    return frame_energy > ENERGY_THRESHOLD;
+}
+
+static void
+hann(double* const frame_buffer, const int frame_size)
+{
+    for (int sample = 0; sample < frame_size; sample++)
+        frame_buffer[sample] *= .5 - .5 * cos(2. * M_PI * sample / frame_size);
+}
 
 // static void
 // fft_init(fftw_complex* const fft_in, fftw_complex* const fft_out, const int fft_size)
@@ -97,36 +111,42 @@ frame_is_useful(const double* const frame_buffer, const int frame_size)
 //     fftw_destroy_plan(fft_plan);
 // }
 
-static int
-get_frequency(const double* const frame_buffer, const int frame_size, const double sample_rate)
-{
-    double max_amp_1 = 0, max_amp_2 = 0;
-    double max_amp_sample_1 = 0, max_amp_sample_2 = 0;
+// static int
+// get_max_amplitude_sample(const double* const amplitudes, const int fft_size)
+// {
+//     int max_amplitude_sample = 0;
+//     for (int sample = 1; sample < fft_size / 2; sample++)
+//         if (amplitudes[max_amplitude_sample] < amplitudes[sample])
+//             max_amplitude_sample = sample;
+//     return max_amplitude_sample;
+// }
 
-    for (int sample = 0; sample < frame_size; sample++) {
-        if (max_amp_1 < frame_buffer[sample]) {
-            max_amp_2 = max_amp_1;
-            max_amp_sample_2 = max_amp_sample_1;
-            max_amp_1 = frame_buffer[sample];
-            max_amp_sample_1 = sample;
-        } else if (max_amp_2 < frame_buffer[sample]) {
-            max_amp_2 = frame_buffer[sample];
-            max_amp_sample_2 = sample;
-        }
-    }
+// static int
+// get_frequency(const double* const amplitudes, const int sample, const double sample_rate, const int fft_size, const bool interpolate)
+// {
+//     if (!interpolate)
+//         return sample * sample_rate / fft_size;
 
-    return max_amp_sample_2;
-}
+//     double left, current, right, delta;
+//     left = 20 * log(amplitudes[sample - 1]);
+//     current = 20 * log(amplitudes[sample]);
+//     right = 20 * log(amplitudes[sample + 1]);
+//     delta = .5 * (left - right) / (left - 2 * current + right);
+//     return (sample + delta) * sample_rate / fft_size;
+// }
 
 static int
 get_pitch(const double frequency)
 {
-    const int H0 = 57, F0 = 440;
+    const double H0 = 57., F0 = 440.;
     return ((int)round(H0 + 12 * log2(frequency / F0))) % 12;
 }
 
 int main(const int argc, const char* const* const argv)
 {
+    if (argc != 2)
+        usage(argv[0]);
+
     SNDFILE* input_file = NULL;
     SF_INFO input_info;
     if ((input_file = sf_open(argv[1], SFM_READ, &input_info)) == NULL) {
@@ -137,6 +157,7 @@ int main(const int argc, const char* const* const argv)
 
     const double sample_rate = input_info.samplerate;
     const int channels = input_info.channels;
+    const int size = input_info.frames;
 
     double hop_buffer[HOP_SIZE];
     double frame_buffer[FRAME_SIZE];
@@ -150,6 +171,11 @@ int main(const int argc, const char* const* const argv)
         }
     }
 
+    plot = gnuplot_init();
+    gnuplot_setstyle(plot, "lines");
+
+    double energies[size / FRAME_SIZE];
+
     // int fft_size = FRAME_SIZE;
     // fftw_complex fft_in[fft_size], fft_out[fft_size];
     // double amplitudes[fft_size], phases[fft_size];
@@ -159,40 +185,46 @@ int main(const int argc, const char* const* const argv)
     while (read_samples(hop_buffer, input_file, HOP_SIZE, channels)) {
         fill_frame_buffer(frame_buffer, hop_buffer, FRAME_SIZE, HOP_SIZE);
 
-        if (!frame_is_useful(frame_buffer, FRAME_SIZE)) {
+        energies[frame_id] = get_energy(frame_buffer, FRAME_SIZE);
+        if (!frame_is_useful(energies[frame_id])) {
             frame_id++;
             continue;
         }
 
-        // hann(frame_buffer, FRAME_SIZE);
+        hann(frame_buffer, FRAME_SIZE);
+
         // fft(fft_in, frame_buffer, fft_size, FRAME_SIZE);
         // cartesian_to_polar(amplitudes, phases, fft_out, fft_size);
 
-        // double max_amp = 0;
-        // double max_amp_freq = 0;
-        // for (int sample = 0; sample < fft_size / 2; sample++)
-        //     if (max_amp < amplitudes[sample]) {
-        //         max_amp = amplitudes[sample];
-        //         double left = 20 * log(amplitudes[sample - 1]);
-        //         double current = 20 * log(amplitudes[sample]);
-        //         double right = 20 * log(amplitudes[sample + 1]);
-        //         double delta = .5 * (left - right) / (left - 2 * current + right);
-        //         max_amp_freq = (sample + delta) * sample_rate / fft_size;
-        //     }
+        int max_sample = 0;
+        double r[FRAME_SIZE];
+        for (int sample = 0; sample < FRAME_SIZE; sample++) {
+            double peak = 0.;
+            for (int i = 0; i < FRAME_SIZE - sample; i++)
+                peak += frame_buffer[i] * frame_buffer[i + sample];
+            r[sample] = peak / FRAME_SIZE;
+            if (r[sample] > r[max_sample])
+                max_sample = sample;
+        }
 
-        // printf("Max Amplitude Frequency: %.2lf.\n", max_amp_freq);
+        const double frequency = sample_rate / max_sample;
+        const int pitch = get_pitch(frequency);
+        printf("Pitch: %d.\n", pitch);
 
-        // int pitch = get_pitch(max_amp_freq);
-        // printf("Pitch: %d.\n", pitch);
-
-        int frequency = get_frequency(frame_buffer, FRAME_SIZE, sample_rate);
-        printf("New Max Amplitude Frequency: %d.\n", frequency);
-
-        int pitch = get_pitch(frequency);
-        printf("New Pitch: %d.\n", pitch);
+        if (PLOT) {
+            gnuplot_resetplot(plot);
+            gnuplot_plot_x(plot, r, FRAME_SIZE, "…");
+            sleep(1);
+        }
 
         frame_id++;
     }
+
+    // if (PLOT) {
+    //     gnuplot_resetplot(plot);
+    //     gnuplot_plot_x(plot, energies, size / FRAME_SIZE, "Energy according to frame");
+    //     sleep(10);
+    // }
 
     // fft_exit();
     sf_close(input_file);
