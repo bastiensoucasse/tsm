@@ -1,6 +1,0 @@
-{
-    "files.associations": {
-        "gnuplot_i.h": "c",
-        "stdbool.h": "c"
-    }
-}

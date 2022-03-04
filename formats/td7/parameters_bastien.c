@@ -17,6 +17,13 @@
 static fftw_plan fft_plan;
 static gnuplot_ctrl* plot;
 
+static void
+usage(const char* const progname)
+{
+    fprintf(stderr, "Usage: %s FILE.\n", progname);
+    exit(EXIT_FAILURE);
+}
+
 static bool
 read_samples(double* const hop_buffer, SNDFILE* const input_file, const int hop_size, const char channels)
 {
@@ -159,13 +166,16 @@ frequency_to_bark(const double frequency)
 // }
 
 static double
-get_audibility(const double frequency)
+get_hearing_threshold(const double frequency)
 {
     return 3.64 * pow(frequency / 1000, -.8) - 6.5 * exp(-.6 * pow(frequency / 1000 - 3.3, 2)) + pow(10., -3) * pow(frequency / 1000, 4);
 }
 
 int main(const int argc, const char* const* const argv)
 {
+    if (argc != 2)
+        usage(argv[0]);
+
     SNDFILE* input_file = NULL;
     SF_INFO input_info;
     if ((input_file = sf_open(argv[1], SFM_READ, &input_info)) == NULL) {
@@ -198,7 +208,7 @@ int main(const int argc, const char* const* const argv)
     int fft_size = FRAME_SIZE;
     fftw_complex fft_in[fft_size], fft_out[fft_size];
     double amplitudes[fft_size], phases[fft_size];
-    double frequencies[fft_size], loudness[fft_size], barks[fft_size], audibility[fft_size];
+    double frequencies[fft_size], loudness[fft_size], barks[fft_size], hearing_threshold[fft_size];
     fft_init(fft_in, fft_out, fft_size);
 
     int frame_id = 0;
@@ -226,23 +236,23 @@ int main(const int argc, const char* const* const argv)
             barks[sample] = frequency_to_bark(frequencies[sample]);
 
         for (int sample = 0; sample < fft_size; sample++)
-            audibility[sample] = get_audibility(frequencies[sample]);
+            hearing_threshold[sample] = get_hearing_threshold(frequencies[sample]);
 
         if (PLOT) {
             gnuplot_resetplot(plot);
             // gnuplot_plot_xy(plot, frequencies, amplitudes, FRAME_SIZE / 2, "Amplitude according to frequency");
-            gnuplot_plot_xy(plot, barks, audibility, FRAME_SIZE / 2, "Audibility according to frequency");
-            gnuplot_plot_xy(plot, barks, loudness, FRAME_SIZE / 2, "Loudness according to frequency");
+            gnuplot_plot_xy(plot, barks, hearing_threshold, FRAME_SIZE / 2, "Hearing threshold according to Bark");
+            gnuplot_plot_xy(plot, barks, loudness, FRAME_SIZE / 2, "Loudness according to Bark");
             sleep(1);
         }
 
         frame_id++;
     }
 
-    if (PLOT) {
-        gnuplot_plot_x(plot, energies, size / FRAME_SIZE, "Energy");
-        sleep(10);
-    }
+    // if (PLOT) {
+    //     gnuplot_plot_x(plot, energies, size / FRAME_SIZE, "Energy according to frame");
+    //     sleep(10);
+    // }
 
     fft_exit();
     sf_close(input_file);

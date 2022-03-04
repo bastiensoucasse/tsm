@@ -17,6 +17,13 @@
 static fftw_plan fft_plan;
 static gnuplot_ctrl* plot;
 
+static void
+usage(const char* const progname)
+{
+    fprintf(stderr, "Usage: %s FILE.\n", progname);
+    exit(EXIT_FAILURE);
+}
+
 static bool
 read_samples(double* const hop_buffer, SNDFILE* const input_file, const int hop_size, const char channels)
 {
@@ -157,14 +164,17 @@ frequency_to_bark(const double frequency)
 // }
 
 static double
-get_audibility(const double frequency)
+get_hearing_threshold(const double frequency)
 {
-    /// TODO: Get frequency audibility value: A(F).
+    /// TODO: Get frequency hearing threshold value: A(F).
     return 0.;
 }
 
 int main(const int argc, const char* const* const argv)
 {
+    if (argc != 2)
+        usage(argv[0]);
+
     SNDFILE* input_file = NULL;
     SF_INFO input_info;
     if ((input_file = sf_open(argv[1], SFM_READ, &input_info)) == NULL) {
@@ -224,13 +234,13 @@ int main(const int argc, const char* const* const argv)
         double barks[fft_size];
         /// TODO: Implement frequency_to_bark() and use it to fill barks array.
 
-        double audibility[fft_size];
-        /// TODO: Implement get_audibility() and use it to fill audibility array.
+        double hearing_threshold[fft_size];
+        /// TODO: Implement get_hearing_threshold() and use it to fill hearing threshold array.
 
         if (PLOT) {
             gnuplot_resetplot(plot);
             // gnuplot_plot_xy(plot, frequencies, amplitudes, FRAME_SIZE / 2, "Amplitude according to frequency");
-            gnuplot_plot_xy(plot, barks, audibility, FRAME_SIZE / 2, "Audibility according to Bark");
+            gnuplot_plot_xy(plot, barks, hearing_threshold, FRAME_SIZE / 2, "Hearing threshold according to Bark");
             gnuplot_plot_xy(plot, barks, loudness, FRAME_SIZE / 2, "Loudness according to Bark");
             sleep(1);
         }
@@ -238,10 +248,10 @@ int main(const int argc, const char* const* const argv)
         frame_id++;
     }
 
-    if (PLOT) {
-        gnuplot_plot_x(plot, energies, size / FRAME_SIZE, "Energy");
-        sleep(10);
-    }
+    // if (PLOT) {
+    //     gnuplot_plot_x(plot, energies, size / FRAME_SIZE, "Energy according to frame");
+    //     sleep(10);
+    // }
 
     fft_exit();
     sf_close(input_file);
