@@ -250,6 +250,7 @@ int main(const int argc, const char* const* const argv)
     }
 
     // if (PLOT) {
+    //     gnuplot_resetplot(plot);
     //     gnuplot_plot_x(plot, energies, size / FRAME_SIZE, "Energy according to frame");
     //     sleep(10);
     // }
