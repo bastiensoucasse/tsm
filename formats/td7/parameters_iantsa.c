@@ -138,36 +138,40 @@ get_frequency(const double* const amplitudes, const int sample, const double sam
 static double
 amplitude_to_loudness(const double amplitude)
 {
-    /// TODO: Convert amplitude to loudness: V(A).
-    return 0.;
+    // Convert amplitude to loudness: V(A).
+    return 20 * log10(amplitude / 1e-6);
 }
 
 // static double
 // loudness_to_amplitude(const double loudness)
 // {
 //     // Convert loundness to amplitude: A(V).
-//     return 0.;
+//     return 10e-6 * pow(10, loudness / 20);
 // }
 
 static double
 frequency_to_bark(const double frequency)
 {
-    /// TODO: Convert frequency to Bark: B(F).
-    return 0.;
+    // Convert frequency to Bark: B(F).
+    if (frequency <= 500)
+        return frequency / 100;
+    return 9 + 4*log2(frequency / 1000);
 }
 
 // static double
 // bark_to_frequency(const double bark)
 // {
 //     // Convert Bark to frequency: F(B).
-//     return 0.;
+//     if (bark <= 5)
+//         return 100 * bark;
+//     return 1000 * pow(2, (bark-9) / 4);
 // }
 
 static double
 get_hearing_threshold(const double frequency)
 {
-    /// TODO: Get frequency hearing threshold value: A(F).
-    return 0.;
+    // Get frequency hearing threshold value: A(F).
+    return 3.64 * pow((frequency/1000), -0.8) -  6.5 * pow(10, -0.6*pow((frequency / 1000-3.3), 2)) + 1e-3 * pow(frequency / 1000, 4);
 }
 
 int main(const int argc, const char* const* const argv)
@@ -225,17 +229,23 @@ int main(const int argc, const char* const* const argv)
         cartesian_to_polar(amplitudes, phases, fft_out, fft_size);
 
         double loudness[fft_size];
-        /// TODO: Implement amplitude_to_loudness() and use it to fill loudness array.
-
+        // Implement amplitude_to_loudness() and use it to fill loudness array.
+        for (int i = 0; i < fft_size; i++)
+            loudness[i] = amplitude_to_loudness(amplitudes[i]);
+            
         double frequencies[fft_size];
         for (int sample = 0; sample < fft_size; sample++)
             frequencies[sample] = get_frequency(amplitudes, sample, sample_rate, fft_size, false);
 
         double barks[fft_size];
-        /// TODO: Implement frequency_to_bark() and use it to fill barks array.
+        // Implement frequency_to_bark() and use it to fill barks array.
+        for (int i = 0; i < fft_size; i++)
+            barks[i] = frequency_to_bark(frequencies[i]);
 
         double hearing_threshold[fft_size];
-        /// TODO: Implement get_hearing_threshold() and use it to fill hearing threshold array.
+        // Implement get_hearing_threshold() and use it to fill hearing threshold array.
+        for (int i = 0; i < fft_size; i++)
+            hearing_threshold[i] = get_hearing_threshold(frequencies[i]);
 
         if (PLOT) {
             gnuplot_resetplot(plot);
