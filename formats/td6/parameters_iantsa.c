@@ -1,352 +1,226 @@
-#include <complex.h>
-#include <fftw3.h>
-#include <math.h>
-#include <sndfile.h>
-#include <stdbool.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+#include <complex.h>
+#include <fftw3.h>
+#include <sndfile.h>
+
+#include <math.h>
 
 #include "gnuplot_i.h"
 
-#define PLOT false
+#define FRAME_SIZE 1024
+#define HOP_SIZE 1024
+#define H0 57
+#define F0 440.
 
-#define FRAME_SIZE 2205
-#define HOP_SIZE 2205
+static gnuplot_ctrl* h;
+static fftw_plan plan;
 
-#define AMP_THRESHOLD 40.
-#define EVENT_TIME 0.05
-
-static gnuplot_ctrl* h; // Plot graph.
-static fftw_plan plan; // FFT plan.
-
-// Correspondance table.
-static char event_name[3] = { 'A', 'B', 'C' };
-static double event_freq[3] = { 19126., 19584., 20032. };
-
-/**
- * @brief Fills the frame buffer from the hop buffer.
- *
- * @param buffer The frame buffer.
- * @param new_buffer The hop buffer.
- */
+static void
+print_usage(char* progname)
+{
+    printf("\nUsage : %s <input file> \n", progname);
+    puts("\n");
+}
 static void
 fill_buffer(double* buffer, double* new_buffer)
 {
     int i;
     double tmp[FRAME_SIZE - HOP_SIZE];
 
+    /* save */
     for (i = 0; i < FRAME_SIZE - HOP_SIZE; i++)
         tmp[i] = buffer[i + HOP_SIZE];
 
-    for (i = 0; i < FRAME_SIZE - HOP_SIZE; i++)
+    /* save offset */
+    for (i = 0; i < (FRAME_SIZE - HOP_SIZE); i++) {
         buffer[i] = tmp[i];
+    }
 
-    for (i = 0; i < HOP_SIZE; i++)
+    for (i = 0; i < HOP_SIZE; i++) {
         buffer[FRAME_SIZE - HOP_SIZE + i] = new_buffer[i];
+    }
 }
 
-/**
- * @brief Reads n samples from file into the buffer.
- *
- * @param infile The file (sound) to read.
- * @param buffer The buffer to fill.
- * @param channels The number of channels of the sound.
- * @param n The number of samples to read into buffer.
- * @return True if the program read n samples successfully; false otherwise.
- */
 static int
 read_n_samples(SNDFILE* infile, double* buffer, int channels, int n)
 {
+
     if (channels == 1) {
+        /* MONO */
         int readcount;
+
         readcount = sf_readf_double(infile, buffer, n);
+
         return readcount == n;
     } else if (channels == 2) {
+        /* STEREO */
         double buf[2 * n];
-        int readcount;
+        int readcount, k;
         readcount = sf_readf_double(infile, buf, n);
-        for (int k = 0; k < readcount; k++)
-            buffer[k] = (buf[k * 2] + buf[k * 2 + 1]) / 2.;
+        for (k = 0; k < readcount; k++)
+            buffer[k] = (buf[k * 2] + buf[k * 2 + 1]) / 2.0;
+
         return readcount == n;
-    } else
+    } else {
+        /* FORMAT ERROR */
         printf("Channel format error.\n");
+    }
+
     return 0;
 }
 
-/**
- * @brief Reads HOP_SIZE samples from file into the hop buffer.
- *
- * @param infile The file (sound) to read.
- * @param buffer The hop buffer to fill.
- * @param channels The number of channels of the sound.
- * @return True if the program read HOP_SIZE samples successfully; false otherwise.
- */
 static int
 read_samples(SNDFILE* infile, double* buffer, int channels)
 {
     return read_n_samples(infile, buffer, channels, HOP_SIZE);
 }
 
-/**
- * @brief Converts a complex signal from the FFT into two signals of amplitude and phase.
- *
- * @param S The complex signal.
- * @param amp The amplitude signal.
- * @param phs The phase signal.
- */
-static void
-cartesian_to_polar(double complex S[FRAME_SIZE], double amp[FRAME_SIZE], double phs[FRAME_SIZE])
+void fft_init(complex in[FRAME_SIZE], complex spec[FRAME_SIZE])
 {
-    for (int n = 0; n < FRAME_SIZE; n++) {
-        amp[n] = cabs(S[n]);
-        phs[n] = carg(S[n]);
-    }
+    plan = fftw_plan_dft_1d(FRAME_SIZE, in, spec, FFTW_FORWARD, FFTW_ESTIMATE);
 }
 
-/**
- * @brief Initializes the FFT by declaring the data in and out buffers.
- *
- * @param data_in The complex signal before FFT.
- * @param data_out The complex signal after FFT.
- */
-static void
-fft_init(fftw_complex data_in[FRAME_SIZE], fftw_complex data_out[FRAME_SIZE])
-{
-    plan = fftw_plan_dft_1d(FRAME_SIZE, data_in, data_out, FFTW_FORWARD, FFTW_ESTIMATE);
-}
-
-/**
- * @brief Executes the FFT.
- *
- * @param s The input signal (that will be stored into the pre FFT buffer).
- * @param data_in The pre FFT buffer.
- */
-static void
-fft(double s[FRAME_SIZE], fftw_complex data_in[FRAME_SIZE])
-{
-    for (int i = 0; i < FRAME_SIZE; i++)
-        data_in[i] = s[i];
-
-    fftw_execute(plan);
-}
-
-/**
- * @brief Cleans up memory used for the FFT.
- */
-static void
-fft_exit()
+void fft_exit(void)
 {
     fftw_destroy_plan(plan);
 }
 
-/**
- * @brief Converts a signal value into Hann window.
- *
- * @param n The value to convert.
- * @return The converted value.
- */
-static double
-hann(double n)
+void fft_process(void)
 {
-    return .5 - .5 * cos(2 * M_PI * n / FRAME_SIZE);
+    fftw_execute(plan);
 }
 
-/**
- * @brief Estimates peak frequency from previous and next samples values.
- *
- * @param amp
- * @param sample
- * @param SAMPLE_RATE
- *
- * @return The peak frequency computed.
- */
-static double
-parabolic_interpolation(double amp[FRAME_SIZE], int sample, int SAMPLE_RATE)
+double autocorrelation(double buffer[FRAME_SIZE], int SAMPLE_RATE)
 {
-    double al = 20 * log(amp[sample - 1]);
-    double ac = 20 * log(amp[sample]);
-    double ar = 20 * log(amp[sample + 1]);
-    double delta = .5 * (al - ar) / (al - 2 * ac + ar);
-    return (sample + delta) * SAMPLE_RATE / FRAME_SIZE;
-}
+    int imax = 0;
+    double max = 0.0;
 
-/**
- * @brief Checks if there is a peak above 18000 Hz in a portion of the signal.
- * If so, return the value of the first one found,
- * and put the sample index in parameter sample_index.
- *
- * @param amp
- * @param SAMPLE_RATE
- * @param sample_index
- *
- * @return Frequence if found.
- *         -1 otherwhise.
- */
-static double
-inaudible_peak(double amp[FRAME_SIZE], int SAMPLE_RATE, int* sample_index)
-{
-    double freq;
-    for (int i = 0; i < FRAME_SIZE / 2; i++)
-
-        // Check if there is a peak
-        if (amp[i] >= amp[i - 1] && amp[i] > amp[i + 1]) {
-            freq = round(parabolic_interpolation(amp, i, SAMPLE_RATE));
-
-            // Check if the frequence is inaudible
-            if (freq > 18000. && amp[i] > AMP_THRESHOLD) {
-                // printf("amplitude: %lf\n", amp[i]);
-                *sample_index = i;
-                return freq;
-            }
+    for (int i = 50; i < FRAME_SIZE / 2; i++) {
+        if (buffer[i] > max) {
+            max = buffer[i];
+            imax = i;
         }
-    return -1;
+    }
+    double F = (double) SAMPLE_RATE / imax;
+    printf("f = %lf, imax = %d\n", F, imax);
+    return F;
 }
 
-/**
- * @brief Checks if freq corresponds to an existing event.
- * If so, puts the event name in event parameter and computes time code.
- *
- * @param freq
- * @param sample_index
- * @param nb_frames
- * @param event
- * @param time_code
- *
- * @return True if it exists a corresponding event
- *         False otherwise.
- */
-static bool
-is_watermark(double freq, int sample_index, int nb_frames, int SAMPLE_RATE, char* event, double* time_code)
-{
-    for (int i = 0; i < 3; i++)
-        if (event_freq[i] == freq) {
-            *event = event_name[i];
-            *time_code = EVENT_TIME * nb_frames + (sample_index / SAMPLE_RATE);
-            return true;
-        }
-    return false;
-}
 
-static void
-watermarking(char* infilename)
+int main(int argc, char* argv[])
 {
-    // Init file accessing.
+    char *progname, *infilename;
     SNDFILE* infile = NULL;
     SF_INFO sfinfo;
 
-    // Open input file.
-    if ((infile = sf_open(infilename, SFM_READ, &sfinfo)) == NULL) {
-        fprintf(stderr, "Not able to open input file %s.\n", infilename);
-        puts(sf_strerror(NULL));
-        exit(EXIT_FAILURE);
-    }
+    progname = strrchr(argv[0], '/');
+    progname = progname ? progname + 1 : argv[0];
 
-    // Init file reading.
+    if (argc != 2) {
+        print_usage(progname);
+        return 1;
+    };
+
+    infilename = argv[1];
+
+    if ((infile = sf_open(infilename, SFM_READ, &sfinfo)) == NULL) {
+        printf("Not able to open input file %s.\n", infilename);
+        puts(sf_strerror(NULL));
+        return 1;
+    };
+
+    /* Read WAV */
     int nb_frames = 0;
     double new_buffer[HOP_SIZE];
     double buffer[FRAME_SIZE];
 
-    // Init ploting.
+    /* Plot Init */
     h = gnuplot_init();
     gnuplot_setstyle(h, "lines");
 
-    // Check whether FRAME_SIZE & HOP_FILE are correct for file.
-    for (int i = 0; i < FRAME_SIZE / HOP_SIZE - 1; i++) {
+    int i;
+    for (i = 0; i < (FRAME_SIZE / HOP_SIZE - 1); i++) {
         if (read_samples(infile, new_buffer, sfinfo.channels) == 1)
             fill_buffer(buffer, new_buffer);
         else {
-            fprintf(stderr, "Not enough samples.\n");
-            exit(EXIT_FAILURE);
+            printf("not enough samples !!\n");
+            return 1;
         }
     }
 
-    // Retrieve file info.
-    const unsigned int SAMPLE_RATE = sfinfo.samplerate; // 44100 Hz.
-    const unsigned char NUM_CHANNELS = sfinfo.channels; // 1 (mono).
-    const unsigned int SIZE = (int)sfinfo.frames;
+    complex samples[FRAME_SIZE];
+    double amplitude[FRAME_SIZE];
+    complex spectrum[FRAME_SIZE];
 
-    // Display file info.
-    printf("Sample Rate: %d.\n", SAMPLE_RATE);
-    printf("Channels: %d.\n", NUM_CHANNELS);
-    printf("Size: %d.\n", SIZE);
+    /* FFT init */
+    fft_init(samples, spectrum);
 
-    // Initialize FFT.
-    double amp[FRAME_SIZE], phs[FRAME_SIZE];
-    fftw_complex data_in[FRAME_SIZE], data_out[FRAME_SIZE];
-    fft_init(data_in, data_out);
-
-    // bool is_prev_silence = false;
-    // char prev_key = ' ';
-
-    // Loop over each frame.
     while (read_samples(infile, new_buffer, sfinfo.channels) == 1) {
-        // printf("\nProcessing frame %d…\n", nb_frames);
+        /* Process Samples */
+        printf("Processing frame %d\n", nb_frames);
 
-        // Fill frame buffer (original signal during the frame).
+        /* hop size */
         fill_buffer(buffer, new_buffer);
 
-        // Hann window.
-        for (int i = 0; i < FRAME_SIZE; i++)
-            buffer[i] *= hann(i);
+        // fft process
+        for (i = 0; i < FRAME_SIZE; i++) {
+            // Fenetre Hann
+            samples[i] = buffer[i]*(0.5-0.5*cos(2.0*M_PI*(double)i/FRAME_SIZE));
+            // Fenetre rect
+            // samples[i] = buffer[i];
+        }
+        for (i = FRAME_SIZE; i < FRAME_SIZE; i++) {
+            samples[i] = 0.0;
+        }
 
-        // Execute FFT.
-        fft(buffer, data_in);
-        cartesian_to_polar(data_out, amp, phs);
+        fft_process();
 
-        // Normalize amplitude signal (values between 0 and 1).
-        // for (int i = 0; i < FRAME_SIZE; i++)
-        //     amp[i] *= 2. / FRAME_SIZE;
+        // spectrum contient les complexes résultats de la fft
+        for (i = 0; i < FRAME_SIZE; i++) {
+            amplitude[i] = cabs(spectrum[i]);
+        }
 
-        // Retrieve maximum amplitude, and position associated.
-        double max_amp = amp[0];
-        int max_amp_i = 0;
-        for (int i = 1; i < FRAME_SIZE / 2; i++) { // No need to go further, the other half is symetrical.
-            if (max_amp < amp[i]) {
-                max_amp = amp[i];
-                max_amp_i = i;
+        int imax = 0;
+        double max = 0.0;
+
+        for (i = 0; i < FRAME_SIZE / 2; i++) {
+            if (amplitude[i] > max) {
+                max = amplitude[i];
+                imax = i;
             }
         }
+        printf("max %d %f\n", imax, (double)imax * sfinfo.samplerate / FRAME_SIZE);
 
-        // Find watermark.
-        int sample_index;
-        double freq = inaudible_peak(amp, SAMPLE_RATE, &sample_index);
-        // if (freq > 0) printf("%lf\n", freq);
+        /* TODO */
+        // double F = imax * sfinfo.samplerate / FRAME_SIZE;
+        double F = autocorrelation(buffer, sfinfo.samplerate);
+        int H = round(H0 + 12 * log2(F/F0));
+            
+        int pitch = H % 12;
 
-        char event;
-        double time_code;
-        if (is_watermark(freq, sample_index, nb_frames, SAMPLE_RATE, &event, &time_code))
-            printf("%.2f s: %c\n", time_code, event);
+        printf("pitch %d \n", pitch);
 
-        // Display the frame.
-        if (PLOT) {
-            gnuplot_resetplot(h);
-            // gnuplot_plot_x(h, buffer, FRAME_SIZE, "Temporal Frame");
-            gnuplot_plot_x(h, amp, FRAME_SIZE / 10, "Spectral Frame");
-            sleep(1);
-        }
+        /* plot amplitude */
+        // gnuplot_resetplot(h);
+        // gnuplot_plot_x(h, amplitude, FRAME_SIZE / 2, "amplitude");
+        // sleep(1);
 
-        // Increase frame id for next frame.
+        /* PLOT */
+        // gnuplot_resetplot(h);
+        // gnuplot_plot_x(h,buffer,FRAME_SIZE,"temporal frame");
+        // sleep(1);
+
         nb_frames++;
     }
 
-    // Shut down FFT, close file and exit program.
-    fft_exit();
     sf_close(infile);
-}
 
-int main(int argc, char** argv)
-{
-    printf("--- \"sounds/flux1.wav\" ---\n");
-    watermarking("sounds/flux1.wav");
+    /* FFT exit */
+    fft_exit();
 
-    printf("\n--- \"sounds/flux2.wav\" ---\n");
-    watermarking("sounds/flux2.wav");
-
-    printf("\n--- \"sounds/flux3.wav\" ---\n");
-    watermarking("sounds/flux3.wav");
-
-    printf("\n--- \"sounds/flux4.wav\" ---\n");
-    watermarking("sounds/flux4.wav");
-
-    return EXIT_SUCCESS;
-}
+    return 0;
+} /* main */
