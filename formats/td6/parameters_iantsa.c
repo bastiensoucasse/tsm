@@ -94,20 +94,13 @@ void fft_process(void)
     fftw_execute(plan);
 }
 
-double autocorrelation(double buffer[FRAME_SIZE], int SAMPLE_RATE)
+double autocorrelation(double buffer[FRAME_SIZE], int tau)
 {
-    int imax = 0;
-    double max = 0.0;
+    double res = 0;
+    for (int n = 0; n < FRAME_SIZE - tau; n++)
+        res += buffer[n] * buffer[n+tau];
 
-    for (int i = 50; i < FRAME_SIZE / 2; i++) {
-        if (buffer[i] > max) {
-            max = buffer[i];
-            imax = i;
-        }
-    }
-    double F = (double) SAMPLE_RATE / imax;
-    printf("f = %lf, imax = %d\n", F, imax);
-    return F;
+    return res / FRAME_SIZE;
 }
 
 
@@ -197,7 +190,29 @@ int main(int argc, char* argv[])
 
         /* TODO */
         // double F = imax * sfinfo.samplerate / FRAME_SIZE;
-        double F = autocorrelation(buffer, sfinfo.samplerate);
+
+        double r[FRAME_SIZE];
+        int tau_min = 10;
+
+        for (int tau = tau_min; tau < FRAME_SIZE; tau++)
+            r[tau] = autocorrelation(buffer, tau);
+
+        double max_amp = 0;
+        int max_amp_tau = 0;
+        for (int i = 0; i < FRAME_SIZE; i++)
+        {
+            if (r[i] > r[max_amp_tau])
+            {
+                max_amp = r[i];
+                max_amp_tau = i;
+            }
+        }
+        
+        printf("tau: %d\n", max_amp_tau);
+
+        double F = (double) sfinfo.samplerate / max_amp_tau;
+        printf("F: %lf\n", F);
+
         int H = round(H0 + 12 * log2(F/F0));
             
         int pitch = H % 12;
