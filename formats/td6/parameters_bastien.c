@@ -135,6 +135,23 @@ hann(double* const frame_buffer, const int frame_size)
 //     return (sample + delta) * sample_rate / fft_size;
 // }
 
+static double
+autocorrelation(const double* const frame_buffer, const int frame_size, const int sample_rate)
+{
+    double rt[frame_size];
+    for (int r = 10; r < frame_size; r++) {
+        rt[r] = 0.;
+        for (int i = 0; i < frame_size - r; i++)
+            rt[r] += frame_buffer[i] * frame_buffer[i + r] / frame_size;
+    }
+
+    int r_max = 0;
+    for (int i = 0; i < FRAME_SIZE; i++)
+        if (rt[r_max] < rt[i])
+            r_max = i;
+    return sample_rate / r_max;
+}
+
 static int
 get_pitch(const double frequency)
 {
@@ -196,24 +213,13 @@ int main(const int argc, const char* const* const argv)
         // fft(fft_in, frame_buffer, fft_size, FRAME_SIZE);
         // cartesian_to_polar(amplitudes, phases, fft_out, fft_size);
 
-        int max_sample = 0;
-        double r[FRAME_SIZE];
-        for (int sample = 0; sample < FRAME_SIZE; sample++) {
-            double peak = 0.;
-            for (int i = 0; i < FRAME_SIZE - sample; i++)
-                peak += frame_buffer[i] * frame_buffer[i + sample];
-            r[sample] = peak / FRAME_SIZE;
-            if (r[sample] > r[max_sample])
-                max_sample = sample;
-        }
-
-        const double frequency = sample_rate / max_sample;
+        const double frequency = autocorrelation(frame_buffer, FRAME_SIZE, sample_rate);
         const int pitch = get_pitch(frequency);
         printf("Pitch: %d.\n", pitch);
 
         if (PLOT) {
             gnuplot_resetplot(plot);
-            gnuplot_plot_x(plot, r, FRAME_SIZE, "…");
+            // gnuplot_plot_x(plot, r, FRAME_SIZE, "…");
             sleep(1);
         }
 
