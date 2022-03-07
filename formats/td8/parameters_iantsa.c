@@ -1,260 +1,223 @@
-#include <complex.h>
-#include <fftw3.h>
-#include <math.h>
-#include <sndfile.h>
-#include <stdbool.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+#include <complex.h>
+#include <fftw3.h>
+#include <sndfile.h>
+
+#include <math.h>
 
 #include "gnuplot_i.h"
 
-#define PLOT true
+#define FRAME_SIZE 2048
+#define HOP_SIZE 2048
+#define O 50
 
-#define FRAME_SIZE 1024
-#define HOP_SIZE 1024
-#define ENERGY_THRESHOLD .002
-
-static fftw_plan fft_plan;
-static gnuplot_ctrl* plot;
+static gnuplot_ctrl* h;
+static fftw_plan plan;
+static fftw_plan iplan;
 
 static void
-usage(const char* const progname)
+print_usage(char* progname)
 {
-    fprintf(stderr, "Usage: %s FILE.\n", progname);
-    exit(EXIT_FAILURE);
+    printf("\nUsage : %s <input file> \n", progname);
+    puts("\n");
 }
 
-static bool
-read_samples(double* const hop_buffer, SNDFILE* const input_file, const int hop_size, const char channels)
+static void
+fill_buffer(double* buffer, double* new_buffer)
 {
-    if (channels == 2) {
-        double tmp[2 * hop_size];
-        const int read_count = sf_readf_double(input_file, tmp, hop_size);
-        for (int sample = 0; sample < read_count; sample++)
-            hop_buffer[sample] = (tmp[sample * 2] + tmp[sample * 2 + 1]) / 2.;
-        return read_count == hop_size;
+    int i;
+    double tmp[FRAME_SIZE - HOP_SIZE];
+
+    /* save */
+    for (i = 0; i < FRAME_SIZE - HOP_SIZE; i++)
+        tmp[i] = buffer[i + HOP_SIZE];
+
+    /* save offset */
+    for (i = 0; i < (FRAME_SIZE - HOP_SIZE); i++) {
+        buffer[i] = tmp[i];
     }
 
-    if (channels == 1) {
-        const int read_count = sf_readf_double(input_file, hop_buffer, hop_size);
-        return read_count == hop_size;
-    }
-
-    fprintf(stderr, "Channel format error.\n");
-    return false;
-}
-
-static void
-fill_frame_buffer(double* const frame_buffer, const double* const hop_buffer, const int frame_size, const int hop_size)
-{
-    double tmp[frame_size - hop_size];
-
-    for (int sample = 0; sample < frame_size - hop_size; sample++)
-        tmp[sample] = frame_buffer[sample + hop_size];
-
-    for (int sample = 0; sample < frame_size - hop_size; sample++)
-        frame_buffer[sample] = tmp[sample];
-
-    for (int sample = 0; sample < hop_size; sample++)
-        frame_buffer[frame_size - hop_size + sample] = hop_buffer[sample];
-}
-
-static double
-get_energy(const double* const frame_buffer, const int frame_size)
-{
-    double energy = 0.;
-    for (int sample = 0; sample < frame_size; sample++)
-        energy += pow(frame_buffer[sample], 2) / frame_size;
-    return energy;
-}
-
-static bool
-frame_is_useful(const double frame_energy)
-{
-    return frame_energy > ENERGY_THRESHOLD;
-}
-
-// static void
-// hann(double* const frame_buffer, const int frame_size)
-// {
-//     for (int sample = 0; sample < frame_size; sample++)
-//         frame_buffer[sample] *= .5 - .5 * cos(2. * M_PI * sample / frame_size);
-// }
-
-static void
-fft_init(fftw_complex* const fft_in, fftw_complex* const fft_out, const int fft_size)
-{
-    fft_plan = fftw_plan_dft_1d(fft_size, fft_in, fft_out, FFTW_FORWARD, FFTW_ESTIMATE);
-}
-
-static void
-fft(fftw_complex* const fft_in, const double* const signal, const int fft_size, const int frame_size)
-{
-    for (int sample = 0; sample < fft_size; sample++)
-        fft_in[sample] = sample < frame_size ? signal[sample] : 0.;
-
-    fftw_execute(fft_plan);
-}
-
-static void
-fft_exit()
-{
-    fftw_destroy_plan(fft_plan);
-}
-
-static void
-cartesian_to_polar(double* const amplitudes, double* const phases, const double complex* const fft_out, const int fft_size)
-{
-    for (int sample = 0; sample < fft_size; sample++) {
-        amplitudes[sample] = cabs(fft_out[sample]);
-        phases[sample] = carg(fft_out[sample]);
+    for (i = 0; i < HOP_SIZE; i++) {
+        buffer[FRAME_SIZE - HOP_SIZE + i] = new_buffer[i];
     }
 }
-
-// static int
-// get_max_amplitude_sample(const double* const amplitudes, const int fft_size)
-// {
-//     int max_amplitude_sample = 0;
-//     for (int sample = 1; sample < fft_size / 2; sample++)
-//         if (amplitudes[max_amplitude_sample] < amplitudes[sample])
-//             max_amplitude_sample = sample;
-//     return max_amplitude_sample;
-// }
 
 static int
-get_frequency(const double* const amplitudes, const int sample, const double sample_rate, const int fft_size, const bool interpolate)
+read_n_samples(SNDFILE* infile, double* buffer, int channels, int n)
 {
-    if (!interpolate)
-        return sample * sample_rate / fft_size;
 
-    double left, current, right, delta;
-    left = 20 * log(amplitudes[sample - 1]);
-    current = 20 * log(amplitudes[sample]);
-    right = 20 * log(amplitudes[sample + 1]);
-    delta = .5 * (left - right) / (left - 2 * current + right);
-    return (sample + delta) * sample_rate / fft_size;
+    if (channels == 1) {
+        /* MONO */
+        int readcount;
+
+        readcount = sf_readf_double(infile, buffer, n);
+
+        return readcount == n;
+    } else if (channels == 2) {
+        /* STEREO */
+        double buf[2 * n];
+        int readcount, k;
+        readcount = sf_readf_double(infile, buf, n);
+        for (k = 0; k < readcount; k++)
+            buffer[k] = (buf[k * 2] + buf[k * 2 + 1]) / 2.0;
+
+        return readcount == n;
+    } else {
+        /* FORMAT ERROR */
+        printf("Channel format error.\n");
+    }
+
+    return 0;
 }
 
-static double
-amplitude_to_loudness(const double amplitude)
+static int
+read_samples(SNDFILE* infile, double* buffer, int channels)
 {
-    /// TODO: Convert amplitude to loudness: V(A).
+    return read_n_samples(infile, buffer, channels, HOP_SIZE);
+}
+
+void fft_init(complex in[FRAME_SIZE], complex spec[FRAME_SIZE])
+{
+    plan = fftw_plan_dft_1d(FRAME_SIZE, in, spec, FFTW_FORWARD, FFTW_ESTIMATE);
+}
+
+void fft_exit(void)
+{
+    fftw_destroy_plan(plan);
+}
+
+void fft_process(void)
+{
+    fftw_execute(plan);
+}
+
+void ifft_init(complex in[FRAME_SIZE], complex spec[FRAME_SIZE])
+{
+    iplan = fftw_plan_dft_1d(FRAME_SIZE, in, spec, FFTW_BACKWARD, FFTW_ESTIMATE);
+}
+
+void ifft_exit(void)
+{
+    fftw_destroy_plan(iplan);
+}
+
+void ifft_process(void)
+{
+    fftw_execute(iplan);
+}
+
+double hpb(double n)
+{
+    if (n == 0. || n == O/2)
+        return 1.;
+    if (1. <= n && n < O/2)
+        return 2.;
     return 0.;
 }
 
-// static double
-// loudness_to_amplitude(const double loudness)
-// {
-//     // Convert loundness to amplitude: A(V).
-//     return 0.;
-// }
-
-static double
-frequency_to_bark(const double frequency)
+int main(int argc, char* argv[])
 {
-    /// TODO: Convert frequency to Bark: B(F).
-    return 0.;
-}
+    char *progname, *infilename;
+    SNDFILE* infile = NULL;
+    SF_INFO sfinfo;
 
-// static double
-// bark_to_frequency(const double bark)
-// {
-//     // Convert Bark to frequency: F(B).
-//     return 0.;
-// }
+    progname = strrchr(argv[0], '/');
+    progname = progname ? progname + 1 : argv[0];
 
-static double
-get_hearing_threshold(const double frequency)
-{
-    /// TODO: Get frequency hearing threshold value: A(F).
-    return 0.;
-}
+    if (argc != 2) {
+        print_usage(progname);
+        return 1;
+    };
 
-int main(const int argc, const char* const* const argv)
-{
-    if (argc != 2)
-        usage(argv[0]);
+    infilename = argv[1];
 
-    SNDFILE* input_file = NULL;
-    SF_INFO input_info;
-    if ((input_file = sf_open(argv[1], SFM_READ, &input_info)) == NULL) {
-        fprintf(stderr, "Not able to open input file %s.\n", argv[1]);
+    if ((infile = sf_open(infilename, SFM_READ, &sfinfo)) == NULL) {
+        printf("Not able to open input file %s.\n", infilename);
         puts(sf_strerror(NULL));
-        exit(EXIT_FAILURE);
-    }
+        return 1;
+    };
 
-    const double sample_rate = input_info.samplerate;
-    const int channels = input_info.channels;
-    const int size = input_info.frames;
+    /* Read WAV */
+    int nb_frames = 0;
+    double new_buffer[HOP_SIZE];
+    double buffer[FRAME_SIZE];
 
-    double hop_buffer[HOP_SIZE];
-    double frame_buffer[FRAME_SIZE];
+    /* Plot Init */
+    h = gnuplot_init();
+    gnuplot_setstyle(h, "lines");
 
-    for (int sample = 0; sample < FRAME_SIZE / HOP_SIZE - 1; sample++) {
-        if (read_samples(hop_buffer, input_file, HOP_SIZE, channels))
-            fill_frame_buffer(frame_buffer, hop_buffer, FRAME_SIZE, HOP_SIZE);
+    int i;
+    for (i = 0; i < (FRAME_SIZE / HOP_SIZE - 1); i++) {
+        if (read_samples(infile, new_buffer, sfinfo.channels) == 1)
+            fill_buffer(buffer, new_buffer);
         else {
-            fprintf(stderr, "Not enough samples.\n");
-            exit(EXIT_FAILURE);
+            printf("not enough samples !!\n");
+            return 1;
         }
     }
 
-    plot = gnuplot_init();
-    gnuplot_setstyle(plot, "lines");
+    complex samples[FRAME_SIZE];
+    double amplitude[FRAME_SIZE];
+    complex spectrum[FRAME_SIZE];
 
-    double energies[size / FRAME_SIZE];
+    /* FFT init */
+    double complex ifft_out[FRAME_SIZE];
+    double spec_env[FRAME_SIZE];
+    fft_init(samples, spectrum);
+    ifft_init(spectrum, ifft_out);    
 
-    int fft_size = FRAME_SIZE;
-    fftw_complex fft_in[fft_size], fft_out[fft_size];
-    double amplitudes[fft_size], phases[fft_size];
-    fft_init(fft_in, fft_out, fft_size);
+    while (read_samples(infile, new_buffer, sfinfo.channels) == 1) {
+        /* Process Samples */
+        printf("Processing frame %d\n", nb_frames);
 
-    int frame_id = 0;
-    while (read_samples(hop_buffer, input_file, HOP_SIZE, channels)) {
-        fill_frame_buffer(frame_buffer, hop_buffer, FRAME_SIZE, HOP_SIZE);
+        /* hop size */
+        fill_buffer(buffer, new_buffer);
 
-        energies[frame_id] = get_energy(frame_buffer, FRAME_SIZE);
-        if (!frame_is_useful(energies[frame_id])) {
-            frame_id++;
-            continue;
+        // fft process
+        for (i = 0; i < FRAME_SIZE; i++) {
+            // Fenetre rect
+            samples[i] = buffer[i];
         }
 
-        // hann(frame_buffer, FRAME_SIZE);
+        /* TODO */
+        fft_process();
 
-        fft(fft_in, frame_buffer, fft_size, FRAME_SIZE);
-        cartesian_to_polar(amplitudes, phases, fft_out, fft_size);
-
-        double loudness[fft_size];
-        /// TODO: Implement amplitude_to_loudness() and use it to fill loudness array.
-
-        double frequencies[fft_size];
-        for (int sample = 0; sample < fft_size; sample++)
-            frequencies[sample] = get_frequency(amplitudes, sample, sample_rate, fft_size, false);
-
-        double barks[fft_size];
-        /// TODO: Implement frequency_to_bark() and use it to fill barks array.
-
-        double hearing_threshold[fft_size];
-        /// TODO: Implement get_hearing_threshold() and use it to fill hearing threshold array.
-
-        if (PLOT) {
-            gnuplot_resetplot(plot);
-            // gnuplot_plot_xy(plot, frequencies, amplitudes, FRAME_SIZE / 2, "Amplitude according to frequency");
-            gnuplot_plot_xy(plot, barks, hearing_threshold, FRAME_SIZE / 2, "Hearing threshold according to Bark");
-            gnuplot_plot_xy(plot, barks, loudness, FRAME_SIZE / 2, "Loudness according to Bark");
-            sleep(1);
+        // dB conversion
+        for (int i = 0; i < FRAME_SIZE; i++)
+        {
+            amplitude[i] = log(cabs(spectrum[i]));
+            spectrum[i] = amplitude[i];
         }
 
-        frame_id++;
+        ifft_process();
+
+        // Filter
+        for (int i = 0; i < FRAME_SIZE; i++)
+            samples[i] = hpb(i) * ifft_out[i];
+
+        fft_process();
+
+        for (int i = 0; i < FRAME_SIZE; i++)
+            spec_env[i] = creal(spectrum[i]) / FRAME_SIZE;
+
+        /* plot amplitude */
+        gnuplot_resetplot(h);
+        gnuplot_plot_x(h, amplitude, FRAME_SIZE/2, "amplitude spectrum (dB)");
+        gnuplot_plot_x(h, spec_env, FRAME_SIZE/2, "spectral envelope");
+        sleep(1);
+
+        nb_frames++;
     }
 
-    // if (PLOT) {
-    //     gnuplot_resetplot(plot);
-    //     gnuplot_plot_x(plot, energies, size / FRAME_SIZE, "Energy according to frame");
-    //     sleep(10);
-    // }
+    sf_close(infile);
 
+    /* FFT exit */
     fft_exit();
-    sf_close(input_file);
-    return EXIT_SUCCESS;
-}
+    ifft_exit();
+
+    return 0;
+} /* main */
