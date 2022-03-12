@@ -1,23 +1,29 @@
 CC := gcc
-CFLAGS := -I$(HOMEBREW_PATH)/include -O3 -Wall -g
-LDFLAGS := -I$(HOMEBREW_PATH)/lib -lsndfile -lvorbis -lvorbisenc -logg -lFLAC -lfftw3 -lm
+CFLAGS := -fPIC -std=c17 -g -O3 -Wall -I.
+LDFLAGS := -lfftw3 -lm
+
+PLUGINS := vocal_remover # amplifier # noise_gate
 
 .PHONY: all
 all: iantsa bastien
 
-.PHONY: iantsa
-iantsa: effects_iantsa
+.PHONY: iantsa bastien
+iantsa: ${PLUGINS}_iantsa
+bastien: ${PLUGINS}_bastien
 
-.PHONY: bastien
-bastien: effects_bastien
+.PHONY: ${PLUGINS}_iantsa ${PLUGINS}_bastien
+${PLUGINS}_iantsa: %: %.so
+${PLUGINS}_bastien: %: %.so
 
-effects_iantsa: effects_iantsa.o
-effects_bastien: effects_bastien.o
+%.so: %.o gnuplot_i.o
+	ld -shared ${LDFLAGS} -o $@ $^
 
-%.so: %.c %.o gnuplot_i.o
-	$(CC) -fPIC -c %.c
-	ld -shared %.o gnuplot_i.o -lfftw3 -lm -o plugin.so
+gnuplot_i.o: gnuplot_i.c
+	${CC} -fPIC -std=c17 -g -O3 -I. -o $@ -c $^
+
+%.o: %.c
+	${CC} ${CFLAGS} -o $@ -c $^
 
 .PHONY: clean
 clean:
-	$(RM) *.o effects_iantsa effects_bastien
+	${RM} *.so *.o

@@ -1,0 +1,5 @@
+#!/bin/bash
+
+export LADSPA_PATH=/usr/lib/ladspa
+export LADSPA_PATH=$(pwd):${LADSPA_PATH}
+echo LADSPA_PATH=${LADSPA_PATH}

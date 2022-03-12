@@ -1,6 +1,6 @@
 CC := clang
 CFLAGS := -I$(HOMEBREW_PATH)/include -O3 -Wall -g
-LDFLAGS := -I$(HOMEBREW_PATH)/lib -lsndfile -lvorbis -lvorbisenc -logg -lFLAC -lm -lfftw3
+LDFLAGS := -L$(HOMEBREW_PATH)/lib -lsndfile -lvorbis -lvorbisenc -logg -lFLAC -lm -lfftw3
 
 .PHONY: all
 all: iantsa bastien
