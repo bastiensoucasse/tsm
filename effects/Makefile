@@ -1,5 +1,5 @@
 CC := gcc
-CFLAGS := -fPIC -std=c17 -g -O3 -Wall -I.
+CFLAGS := -fPIC -g -O3 -Wall -I.
 LDFLAGS := -lfftw3 -lm
 
 PLUGINS := vocal_remover # amplifier # noise_gate
@@ -14,9 +14,11 @@ bastien: $(patsubst %, %_bastien.so, ${PLUGINS})
 %.so: %.o gnuplot_i.o
 	ld -shared ${LDFLAGS} -o $@ $^
 
+.PRECIOUS: gnuplot_i.o
+
 %.o: %.c
 	${CC} ${CFLAGS} -o $@ -c $^
 
 .PHONY: clean
 clean:
-	${RM} *.so *.o
+	${RM} $(patsubst %, %*.o, ${PLUGINS}) $(patsubst %, %*.so, ${PLUGINS})
