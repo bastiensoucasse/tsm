@@ -8,18 +8,11 @@ PLUGINS := vocal_remover # amplifier # noise_gate
 all: iantsa bastien
 
 .PHONY: iantsa bastien
-iantsa: ${PLUGINS}_iantsa
-bastien: ${PLUGINS}_bastien
-
-.PHONY: ${PLUGINS}_iantsa ${PLUGINS}_bastien
-${PLUGINS}_iantsa: %: %.so
-${PLUGINS}_bastien: %: %.so
+iantsa: $(patsubst %, %_iantsa.so, ${PLUGINS})
+bastien: $(patsubst %, %_bastien.so, ${PLUGINS})
 
 %.so: %.o gnuplot_i.o
 	ld -shared ${LDFLAGS} -o $@ $^
-
-gnuplot_i.o: gnuplot_i.c
-	${CC} -fPIC -std=c17 -g -O3 -I. -o $@ -c $^
 
 %.o: %.c
 	${CC} ${CFLAGS} -o $@ -c $^
