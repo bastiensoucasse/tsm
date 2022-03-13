@@ -84,12 +84,8 @@ runVocalRemove(LADSPA_Handle Instance,
   pfInput1 = psVocalRemove->m_pfInputBuffer1;
   pfInput2 = psVocalRemove->m_pfInputBuffer2;
 
-
-  /* TODO */
-
-
-
-
+  for (lSampleIndex = 0; lSampleIndex < SampleCount; lSampleIndex++)
+    pfOutput[lSampleIndex] = pfInput1[lSampleIndex] - pfInput2[lSampleIndex];
 
 }
 
