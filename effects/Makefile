@@ -2,7 +2,7 @@ CC := gcc
 CFLAGS := -fPIC -g -O3 -Wall -I.
 LDFLAGS := -lfftw3 -lm
 
-PLUGINS := vocal_remover amplifier # noise_gate
+PLUGINS := vocal_remover amplifier noise_gate
 
 .PHONY: all
 all: iantsa bastien

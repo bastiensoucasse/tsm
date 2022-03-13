@@ -5,9 +5,9 @@
 
 #include "ladspa.h"
 
-#define VOCAL_REMOVE_INPUT1 0 // Input left
-#define VOCAL_REMOVE_INPUT2 1 // Input right
-#define VOCAL_REMOVE_OUTPUT 2 // Mono output
+#define VOCAL_REMOVE_INPUT1 0
+#define VOCAL_REMOVE_INPUT2 1
+#define VOCAL_REMOVE_OUTPUT 2
 
 LADSPA_Descriptor* g_psDescriptor;
 
