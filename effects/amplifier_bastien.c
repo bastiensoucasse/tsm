@@ -11,8 +11,6 @@
 #define PLUGIN_OUTPUT2 3
 #define PLUGIN_PARAM 4
 
-LADSPA_Descriptor* g_psDescriptor;
-
 typedef struct {
     LADSPA_Data* m_pfInputBuffer1;
     LADSPA_Data* m_pfInputBuffer2;
@@ -20,6 +18,8 @@ typedef struct {
     LADSPA_Data* m_pfOutputBuffer2;
     LADSPA_Data* m_pfParam;
 } Plugin;
+
+LADSPA_Descriptor* g_psDescriptor;
 
 LADSPA_Handle
 instantiatePlugin(const LADSPA_Descriptor* Descriptor, unsigned long SampleRate)
@@ -66,8 +66,8 @@ void runPlugin(LADSPA_Handle Instance, unsigned long SampleCount)
     pfParam = psPlugin->m_pfParam;
 
     for (i = 0; i < SampleCount; i++) {
-        pfOutput1[i] = *(pfParam) * pfInput1[i];
-        pfOutput2[i] = *(pfParam) * pfInput2[i];
+        pfOutput1[i] = *(pfParam)*pfInput1[i];
+        pfOutput2[i] = *(pfParam)*pfInput2[i];
     }
 }
 
