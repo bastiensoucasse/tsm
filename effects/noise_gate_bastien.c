@@ -70,7 +70,7 @@ void runPlugin(LADSPA_Handle Instance, unsigned long SampleCount)
     float energy = 0.;
     for (i = 0; i < SampleCount; i++)
         energy += (pow(pfInput1[i], 2.) + pow(pfInput2[i], 2.)) / (2. * SampleCount);
-    
+
     if (energy >= *(pfParam) && noise_gate)
         noise_gate = false;
 
