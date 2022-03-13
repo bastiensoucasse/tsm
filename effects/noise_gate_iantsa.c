@@ -98,12 +98,19 @@ runPlugin(LADSPA_Handle Instance,
   pfInput2 = psPlugin->m_pfInputBuffer2;
   pfParam = psPlugin->m_pfParam;
 
+  float E = 0.0;
+  for (i = 0; i < SampleCount; i++)
+    E += pow(pfInput1[i], 2) + pow(pfInput2[i], 2);
+  
+  E /= 2 * SampleCount;
+  printf("E: %lf\n", E);
 
-  /* TODO */
-
-
-
-
+  for (i = 0; i < SampleCount; i++)
+  {
+    if (E < *(pfParam))
+      pfOutput1[i] = 0.0, pfOutput2[i] = 0.0;
+    pfOutput1[i] = pfInput1[i], pfOutput2[i] = pfInput2[i];
+  }
 }
 
 /*****************************************************************************/
