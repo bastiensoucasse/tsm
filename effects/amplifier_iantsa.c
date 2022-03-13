@@ -99,7 +99,12 @@ void runPlugin(LADSPA_Handle Instance,
     pfInput2 = psPlugin->m_pfInputBuffer2;
     pfParam = psPlugin->m_pfParam;
 
-    /* TODO */
+    for (i = 0; i < SampleCount; i++)
+    {
+        pfOutput1[i] = *(pfParam) * pfInput1[i];
+        pfOutput2[i] = *(pfParam) * pfInput2[i];
+    }
+
 }
 
 /*****************************************************************************/
