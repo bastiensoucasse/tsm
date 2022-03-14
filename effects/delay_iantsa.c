@@ -126,8 +126,35 @@ runPlugin(LADSPA_Handle Instance,
   pfParam1 = *(psPlugin->m_pfParam1);
   pfParam2 = *(psPlugin->m_pfParam2);
 
-  /* TODO */
-  
+  // Delay
+  for (i = 0; i < SampleCount; i++)
+  {
+    int index = i - pfParam2;
+    if (index >= 0)
+    {
+      pfOutput1[i] = (1-pfParam1) * pfInput1[i] + pfParam1 * pfInput1[index];
+      pfOutput2[i] = (1-pfParam1) * pfInput2[i] + pfParam1 * pfInput2[index];
+    }
+    else
+    {
+      pfOutput1[i] = (1-pfParam1) * pfInput1[i] + pfParam1 * save1[index + sr];
+      pfOutput2[i] = (1-pfParam1) * pfInput2[i] + pfParam1 * save2[index + sr];
+    }
+  }
+    
+  // Shift end of savings
+  for (i = 0; i < sr - SampleCount; i++)
+  {
+    save1[i] = save1[i + SampleCount];
+    save2[i] = save2[i + SampleCount];
+  }
+
+  // Save new values
+  for (i = 0; i < SampleCount; i++)
+  {
+    save1[i + (sr - SampleCount)] = pfInput1[i];
+    save2[i + (sr - SampleCount)] = pfInput2[i];
+  }
 }
 
 /*****************************************************************************/
