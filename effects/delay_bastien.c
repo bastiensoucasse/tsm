@@ -88,18 +88,18 @@ void runPlugin(LADSPA_Handle Instance, unsigned long SampleCount)
     for (i = 0; i < SampleCount; i++) {
         int j = i - pfParam2;
         if (j >= 0) {
-            pfOutput1[i] = - pfParam1 * pfInput1[i] + pfParam1 * pfInput1[j];
-            pfOutput2[i] = - pfParam1 * pfInput2[i] + pfParam1 * pfInput2[j];
+            pfOutput1[i] = (1 - pfParam1) * pfInput1[i] + pfParam1 * pfInput1[j];
+            pfOutput2[i] = (1 - pfParam1) * pfInput2[i] + pfParam1 * pfInput2[j];
         } else {
-            pfOutput1[i] = - pfParam1 * pfInput1[i] + pfParam1 * save1[j + sr - 1];
-            pfOutput2[i] = - pfParam1 * pfInput2[i] + pfParam1 * save2[j + sr - 1];
+            pfOutput1[i] = (1 - pfParam1) * pfInput1[i] + pfParam1 * save1[j + sr];
+            pfOutput2[i] = (1 - pfParam1) * pfInput2[i] + pfParam1 * save2[j + sr];
         }
     }
 
     for (i = 0; i < sr; i++) {
         if (i < sr - SampleCount) {
-            save1[i] = save1[i + (sr - SampleCount)];
-            save2[i] = save2[i + (sr - SampleCount)];
+            save1[i] = save1[i + SampleCount];
+            save2[i] = save2[i + SampleCount];
         } else {
             save1[i] = pfInput1[i - (sr - SampleCount)];
             save2[i] = pfInput2[i - (sr - SampleCount)];
