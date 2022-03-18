@@ -1,4 +1,4 @@
-/* vocal remover.c
+/* plugin.c
  */
 
 /*****************************************************************************/
@@ -16,9 +16,11 @@
 
 /* The port numbers for the plugin: */
 
-#define VOCAL_REMOVE_INPUT1    0
-#define VOCAL_REMOVE_INPUT2    1
-#define VOCAL_REMOVE_OUTPUT    2
+#define PLUGIN_INPUT1    0
+#define PLUGIN_INPUT2    1
+#define PLUGIN_OUTPUT1    2
+#define PLUGIN_OUTPUT2    3
+#define PLUGIN_PARAM    4
 
 /*****************************************************************************/
 
@@ -33,35 +35,43 @@ typedef struct {
 
   LADSPA_Data * m_pfInputBuffer1;
   LADSPA_Data * m_pfInputBuffer2;
-  LADSPA_Data * m_pfOutputBuffer;
+  LADSPA_Data * m_pfOutputBuffer1;
+  LADSPA_Data * m_pfOutputBuffer2;
+  LADSPA_Data * m_pfParam;
 
-} VocalRemove;
+} Plugin;
 
 /*****************************************************************************/
 
 /* Construct a new plugin instance. */
 LADSPA_Handle 
-instantiateVocalRemove(const LADSPA_Descriptor * Descriptor,
+instantiatePlugin(const LADSPA_Descriptor * Descriptor,
 		       unsigned long             SampleRate) {
-  return malloc(sizeof(VocalRemove));
+  return malloc(sizeof(Plugin));
 }
 
 /*****************************************************************************/
 
 /* Connect a port to a data location. */
 void 
-connectPortToVocalRemove(LADSPA_Handle Instance,
+connectPortToPlugin(LADSPA_Handle Instance,
 			 unsigned long Port,
 			 LADSPA_Data * DataLocation) {
   switch (Port) {
-  case VOCAL_REMOVE_INPUT1:
-    ((VocalRemove *)Instance)->m_pfInputBuffer1 = DataLocation;
+  case PLUGIN_INPUT1:
+    ((Plugin *)Instance)->m_pfInputBuffer1 = DataLocation;
     break;
-  case VOCAL_REMOVE_INPUT2:
-    ((VocalRemove *)Instance)->m_pfInputBuffer2 = DataLocation;
+  case PLUGIN_INPUT2:
+    ((Plugin *)Instance)->m_pfInputBuffer2 = DataLocation;
     break;
-  case VOCAL_REMOVE_OUTPUT:
-    ((VocalRemove *)Instance)->m_pfOutputBuffer = DataLocation;
+  case PLUGIN_OUTPUT1:
+    ((Plugin *)Instance)->m_pfOutputBuffer1 = DataLocation;
+    break;
+  case PLUGIN_OUTPUT2:
+    ((Plugin *)Instance)->m_pfOutputBuffer2 = DataLocation;
+    break;
+  case PLUGIN_PARAM:
+    ((Plugin *)Instance)->m_pfParam = DataLocation;
     break;
   }
 }
@@ -70,29 +80,43 @@ connectPortToVocalRemove(LADSPA_Handle Instance,
 
 /* Run a delay line instance for a block of SampleCount samples. */
 void 
-runVocalRemove(LADSPA_Handle Instance,
+runPlugin(LADSPA_Handle Instance,
 	 unsigned long SampleCount) {
   
-  VocalRemove * psVocalRemove;
+  Plugin * psPlugin;
   LADSPA_Data * pfInput1;
   LADSPA_Data * pfInput2;
-  LADSPA_Data * pfOutput;
-  unsigned long lSampleIndex;
+  LADSPA_Data * pfOutput1;
+  LADSPA_Data * pfOutput2;
+  LADSPA_Data * pfParam;
+  unsigned long i;
  
-  psVocalRemove = (VocalRemove *)Instance;
-  pfOutput = psVocalRemove->m_pfOutputBuffer;
-  pfInput1 = psVocalRemove->m_pfInputBuffer1;
-  pfInput2 = psVocalRemove->m_pfInputBuffer2;
+  psPlugin = (Plugin *)Instance;
+  pfOutput1 = psPlugin->m_pfOutputBuffer1;
+  pfOutput2 = psPlugin->m_pfOutputBuffer2;
+  pfInput1 = psPlugin->m_pfInputBuffer1;
+  pfInput2 = psPlugin->m_pfInputBuffer2;
+  pfParam = psPlugin->m_pfParam;
 
-  for (lSampleIndex = 0; lSampleIndex < SampleCount; lSampleIndex++)
-    pfOutput[lSampleIndex] = pfInput1[lSampleIndex] - pfInput2[lSampleIndex];
+  float E = 0.0;
+  for (i = 0; i < SampleCount; i++)
+    E += pow(pfInput1[i], 2) + pow(pfInput2[i], 2);
+  
+  E /= 2 * SampleCount;
+  printf("E: %lf\n", E);
 
+  for (i = 0; i < SampleCount; i++)
+  {
+    if (E < *(pfParam))
+      pfOutput1[i] = 0.0, pfOutput2[i] = 0.0;
+    pfOutput1[i] = pfInput1[i], pfOutput2[i] = pfInput2[i];
+  }
 }
 
 /*****************************************************************************/
 
 void 
-cleanupVocalRemove(LADSPA_Handle Instance) {
+cleanupPlugin(LADSPA_Handle Instance) {
   free(Instance);
 }
 
@@ -119,63 +143,78 @@ _init() {
     g_psDescriptor->UniqueID
       = 1910;
     g_psDescriptor->Label
-      = strdup("vocalremover");
+      = strdup("plugin");
     g_psDescriptor->Properties
       = LADSPA_PROPERTY_REALTIME;//HARD_RT_CAPABLE;
     g_psDescriptor->Name 
-      = strdup("Sound VocalRemove");
+      = strdup("Sound Plugin");
     g_psDescriptor->Maker
-      = strdup("Master Enseignements");
+      = strdup("Master UB");
     g_psDescriptor->Copyright
       = strdup("None");
     g_psDescriptor->PortCount
-      = 3;
+      = 5;
     piPortDescriptors
-      = (LADSPA_PortDescriptor *)calloc(3, sizeof(LADSPA_PortDescriptor));
+      = (LADSPA_PortDescriptor *)calloc(5, sizeof(LADSPA_PortDescriptor));
     g_psDescriptor->PortDescriptors
       = (const LADSPA_PortDescriptor *)piPortDescriptors;
 
 
-    piPortDescriptors[VOCAL_REMOVE_INPUT1]
+    piPortDescriptors[PLUGIN_INPUT1]
       = LADSPA_PORT_INPUT | LADSPA_PORT_AUDIO;
-    piPortDescriptors[VOCAL_REMOVE_INPUT2]
+    piPortDescriptors[PLUGIN_INPUT2]
       = LADSPA_PORT_INPUT | LADSPA_PORT_AUDIO;
-    piPortDescriptors[VOCAL_REMOVE_OUTPUT]
+    piPortDescriptors[PLUGIN_OUTPUT1]
       = LADSPA_PORT_OUTPUT | LADSPA_PORT_AUDIO;
+    piPortDescriptors[PLUGIN_OUTPUT2]
+      = LADSPA_PORT_OUTPUT | LADSPA_PORT_AUDIO;
+    piPortDescriptors[PLUGIN_PARAM]
+      = LADSPA_PORT_INPUT | LADSPA_PORT_CONTROL;
     pcPortNames
-      = (char **)calloc(3, sizeof(char *));
+      = (char **)calloc(5, sizeof(char *));
     g_psDescriptor->PortNames 
       = (const char **)pcPortNames;
-    pcPortNames[VOCAL_REMOVE_INPUT1]
+    pcPortNames[PLUGIN_INPUT1]
       = strdup("Input1");
-    pcPortNames[VOCAL_REMOVE_INPUT2]
+    pcPortNames[PLUGIN_INPUT2]
       = strdup("Input2");
-    pcPortNames[VOCAL_REMOVE_OUTPUT]
-      = strdup("Output");
+    pcPortNames[PLUGIN_OUTPUT1]
+      = strdup("Output1");
+    pcPortNames[PLUGIN_OUTPUT2]
+      = strdup("Output2");
+    pcPortNames[PLUGIN_PARAM]
+      = strdup("Control");
     psPortRangeHints = ((LADSPA_PortRangeHint *)
-			calloc(3, sizeof(LADSPA_PortRangeHint)));
+			calloc(5, sizeof(LADSPA_PortRangeHint)));
     g_psDescriptor->PortRangeHints
       = (const LADSPA_PortRangeHint *)psPortRangeHints;
-    psPortRangeHints[VOCAL_REMOVE_INPUT1].HintDescriptor
+    psPortRangeHints[PLUGIN_INPUT1].HintDescriptor
       = 0;
-    psPortRangeHints[VOCAL_REMOVE_INPUT2].HintDescriptor
+    psPortRangeHints[PLUGIN_INPUT2].HintDescriptor
       = 0;
-    psPortRangeHints[VOCAL_REMOVE_OUTPUT].HintDescriptor
+    psPortRangeHints[PLUGIN_OUTPUT1].HintDescriptor
+      = 0;
+    psPortRangeHints[PLUGIN_OUTPUT2].HintDescriptor
+      = 0;
+    psPortRangeHints[PLUGIN_PARAM].HintDescriptor
+      = (LADSPA_HINT_BOUNDED_BELOW 
+	);
+    psPortRangeHints[PLUGIN_PARAM].LowerBound 
       = 0;
     g_psDescriptor->instantiate 
-      = instantiateVocalRemove;
+      = instantiatePlugin;
     g_psDescriptor->connect_port 
-      = connectPortToVocalRemove;
+      = connectPortToPlugin;
     g_psDescriptor->activate
       = NULL;
     g_psDescriptor->run
-      = runVocalRemove;
+      = runPlugin;
     g_psDescriptor->run_adding
       = NULL;
     g_psDescriptor->deactivate
       = NULL;
     g_psDescriptor->cleanup
-      = cleanupVocalRemove;
+      = cleanupPlugin;
   }
 }
 

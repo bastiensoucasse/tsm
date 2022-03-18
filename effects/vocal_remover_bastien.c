@@ -5,17 +5,17 @@
 
 #include "ladspa.h"
 
-#define VOCAL_REMOVE_INPUT1 0 // Input left
-#define VOCAL_REMOVE_INPUT2 1 // Input right
-#define VOCAL_REMOVE_OUTPUT 2 // Mono output
-
-LADSPA_Descriptor* g_psDescriptor;
+#define VOCAL_REMOVE_INPUT1 0
+#define VOCAL_REMOVE_INPUT2 1
+#define VOCAL_REMOVE_OUTPUT 2
 
 typedef struct {
     LADSPA_Data* m_pfInputBuffer1;
     LADSPA_Data* m_pfInputBuffer2;
     LADSPA_Data* m_pfOutputBuffer;
 } VocalRemove;
+
+LADSPA_Descriptor* g_psDescriptor;
 
 LADSPA_Handle
 instantiateVocalRemove(const LADSPA_Descriptor* Descriptor, unsigned long SampleRate)
