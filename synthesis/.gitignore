@@ -1,4 +1,5 @@
 .vscode
-*.so
+*.dSYM
 *.o
-!gnuplot_i.o
+synthesis_iantsa
+synthesis_bastien

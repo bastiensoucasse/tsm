@@ -1,56 +1,43 @@
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
-#define FE 44100
-#define DUREE 5
-#define N DUREE* FE
+#include "sinusoid.h"
+#include "sound_file.h"
 
-/* output */
-static char* RAW_OUT = "tmp-out.raw";
-static char* FILE_OUT = "out.wav";
+#define DURATION 60
+#define CHANNELS 1
+#define SAMPLE_RATE 44100
+#define FRAME_SIZE 1024
 
-FILE* sound_file_open_write(void)
+static const char* const RAW_FILENAME = "outputs/raw_bastien.raw";
+static const char* const OUT_FILENAME = "outputs/out_bastien.wav";
+
+int main(int argc, char** argv)
 {
-    return fopen(RAW_OUT, "wb");
-}
-
-void sound_file_close_write(FILE* fp)
-{
-    char cmd[256];
-    fclose(fp);
-    snprintf(cmd, 256, "sox -c 1 -r %d -e signed-integer -b 16 %s %s", (int)FE, RAW_OUT, FILE_OUT);
-    system(cmd);
-}
-
-void sound_file_write(double* s, FILE* fp)
-{
-    int i;
-    short tmp[N];
-    for (i = 0; i < N; i++) {
-        tmp[i] = (short)(s[i] * 32768);
-    }
-    fwrite(tmp, sizeof(short), N, fp);
-}
-
-int main(int argc, char* argv[])
-{
-    int i;
-    FILE* output;
-    double s[N];
-
     if (argc != 1) {
-        printf("usage: %s\n", argv[0]);
+        printf("Usage: %s\n.", argv[0]);
         exit(EXIT_FAILURE);
     }
 
-    output = sound_file_open_write();
+    FILE* const sound_file = sound_file_open_write(RAW_FILENAME);
 
-    for (i = 0; i < N; i++)
-        s[i] = 0; // ECHANTILLONS
+    sinusoid c = create_sinusoid(.4, 261.63);
+    sinusoid g = create_sinusoid(.3, 391.995);
+    sinusoid e = create_sinusoid(.3, 329.628);
 
-    sound_file_write(s, output);
-    sound_file_close_write(output);
-    exit(EXIT_SUCCESS);
+    int frame = 0;
+    double frame_buffer[FRAME_SIZE];
+    while (frame * FRAME_SIZE < DURATION * SAMPLE_RATE) {
+        for (int sample = 0; sample < FRAME_SIZE; sample++) {
+            frame_buffer[sample] = get_sinusoid_value(c, frame, FRAME_SIZE, sample, SAMPLE_RATE);
+            frame_buffer[sample] += get_sinusoid_value(g, frame, FRAME_SIZE, sample, SAMPLE_RATE);
+            frame_buffer[sample] += get_sinusoid_value(e, frame, FRAME_SIZE, sample, SAMPLE_RATE);
+        }
+
+        sound_file_write(sound_file, frame_buffer, FRAME_SIZE);
+        frame++;
+    }
+
+    sound_file_close_write(sound_file, RAW_FILENAME, OUT_FILENAME, CHANNELS, SAMPLE_RATE);
+    return EXIT_SUCCESS;
 }
