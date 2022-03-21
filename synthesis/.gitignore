@@ -1,5 +1,4 @@
 .vscode
-*.dSYM
-*.o
 synthesis_iantsa
 synthesis_bastien
+*.o
