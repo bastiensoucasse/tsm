@@ -1,0 +1,14 @@
+#N canvas 600 17 662 657 10;
+#X obj 175 202 synthetiseur;
+#X obj 175 144 mtof;
+#X obj 175 65 key;
+#X text 151 9 Mon Piano;
+#X obj 175 106 clavier;
+#X text 202 64 appuier sur une touche;
+#X obj 165 251 dac~;
+#X connect 0 0 6 0;
+#X connect 0 0 6 1;
+#X connect 1 0 0 0;
+#X connect 1 0 0 1;
+#X connect 2 0 4 0;
+#X connect 4 0 1 0;

@@ -1,0 +1,10 @@
+#N canvas 612 308 577 408 10;
+#X obj 181 178 dac~;
+#X obj 181 65 line~;
+#X obj 181 111 osc~;
+#X msg 182 28 200 2000;
+#X msg 299 26 20 2000;
+#X connect 1 0 2 0;
+#X connect 2 0 0 0;
+#X connect 3 0 1 0;
+#X connect 4 0 1 0;
