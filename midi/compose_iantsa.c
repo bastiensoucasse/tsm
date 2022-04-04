@@ -1,25 +1,3 @@
-/**
- * ########################################################################
- *
- * PRAISYYYYYYY: <3
- *
- * Je t'ai mis juste l'enregistrement dans un nouveau fichier plutôt
- * que d'écraser l'original, dans le code y'a rien qui a changé à part
- * le nom du fichier de sortie, passé en argument
- *
- * Les seules modifs, je les ai marqué avec /** CHANGED
- * (je me suis permis pcq en vrai c'est trop chiant pour les tests sans,
- * j'espère que tu m'en voudras pas bb,
- * mais sinon j'ai pas touché ton code, promis)
- *
- * Pour lancer après compilation t'as juste à faire :
- * ./compose_iantsa data/starwars1.mid output/starwars1_iantsa.mid
- *
- * LC: :)
- *
- *  ########################################################################
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -112,7 +90,6 @@ compose(char* midifile, char* savefile)
                 for (int i = 0; i < 12; i++)
                     if (random < prob[i])
                     {
-                        printf("yo\n");
                         cur = i;
                         break;
                     }

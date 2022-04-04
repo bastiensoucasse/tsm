@@ -1,7 +1,7 @@
 CC := clang
 CFLAGS := -I. -g -O3 -Wall
 
-TARGET := compose
+TARGET := midi
 DEPS := midifile
 
 .PHONY: all

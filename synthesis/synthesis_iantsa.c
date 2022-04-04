@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// #include "sinusoid.h"
 #include "sound_file.h"
 
 #define FE 44100

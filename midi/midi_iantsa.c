@@ -17,6 +17,7 @@ getNameNote(int p)
     char* notes[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
     return notes[p%12];
 
+
     // char base = 'C';
 
     // int n = p % 12;
@@ -65,17 +66,30 @@ read_midi(char* midifile)
 }
 
 static void
-transpose(char* midifile_in, char* midifile_out, int t)
+transpose(char* midifile, char* savefile, int t)
 {
-    MidiFile_t md_in = MidiFile_load(midifile_in);
+    MidiFile_t md = MidiFile_load(midifile);
+    
+    MidiFileEvent_t event = MidiFile_getFirstEvent(md);
+    while (event) { 
+        if (MidiFileEvent_isNoteStartEvent(event) && MidiFileNoteStartEvent_getChannel(event) != 10)
+            MidiFileNoteStartEvent_setNote(event, MidiFileNoteStartEvent_getNote(event) + t);
+        
+        event = MidiFileEvent_getNextEventInFile(event);
+    }
+    
+
+    MidiFile_save(md, savefile);
 }
 
 int main(int argc, char** argv)
 {
-    if (argc != 2)
+    if (argc < 2)
         usage(argv[0]);
 
     read_midi(argv[1]);
+
+    transpose(argv[1], argv[2], atoi(argv[3]));
 
     return EXIT_SUCCESS;
 }
