@@ -25,13 +25,12 @@
 
 #include "midifile.h"
 
-static int tab[12][12];
+static float tab[12][12];
 static int cpt;
 
 static void
 usage(char* progname)
 {
-    /** CHANGED: Y'a 3 arguments. */
     fprintf(stderr, "Usage: %s <input> <output>.\n", progname);
     exit(EXIT_FAILURE);
 }
@@ -45,15 +44,10 @@ read_midi(char* midifile)
             tab[i][j] = 0;
 
     MidiFile_t md = MidiFile_load(midifile);
-    /// unsigned char* data;
     int prev = -1, cur;
 
     MidiFileEvent_t event = MidiFile_getFirstEvent(md);
     while (event) {
-        // A completer :
-        // affichage du nom des notes
-        // affichage de la durÈe des notes
-
         if (MidiFileEvent_isNoteStartEvent(event) && MidiFileNoteStartEvent_getChannel(event) != 10) {
             // Pitch
             cur = MidiFileNoteStartEvent_getNote(event);
@@ -69,53 +63,65 @@ read_midi(char* midifile)
     }
 
     // Transform to probabilities
-    int sum = 0;
+    int sum;
     for (int i = 0; i < 12; i++) {
+        sum = 0;
         for (int j = 0; j < 12; j++)
             sum += tab[i][j];
 
-        for (int j = 0; j < 12; j++)
-            tab[i][j] /= sum;
+        if (sum > 0)
+            for (int j = 0; j < 12; j++)
+                tab[i][j] /= sum;
+        
     }
 
     // Display intervals tab
-    for (int i = 0; i < 12; i++) {
-        for (int j = 0; j < 12; j++)
-            printf("%d ", tab[i][j]);
-        printf("\n");
-    }
-    printf("N: %d\n", cpt);
+    // for (int i = 0; i < 12; i++) {
+    //     for (int j = 0; j < 12; j++)
+    //         printf("%f ", tab[i][j]);
+    //     printf("\n");
+    // }
+    // printf("N: %d\n", cpt);
 }
 
-/** CHANGED: On a un fichier de destination. */
 static void
 compose(char* midifile, char* savefile)
 {
     MidiFile_t md = MidiFile_load(midifile);
-    int prev = -1, cur = rand() % 12;
+    int prev = -1, cur;
     float prob[12];
     float random;
 
     MidiFileEvent_t event = MidiFile_getFirstEvent(md);
     while (event) {
         if (MidiFileEvent_isNoteStartEvent(event) && MidiFileNoteStartEvent_getChannel(event) != 10) {
-            // if (prev > 0)
-            // {
-            //     for (int i = 0; i < 12; i++)
-            //         prob[i] = tab[prev][i] + tab[prev][i-1];
+            if (prev < 0)
+                cur = MidiFileNoteStartEvent_getNote(event)%12;
 
-            //     random = (float) rand() / RAND_MAX;
-            //     for (int i = 0; i < 12; i++)
-            //         if (tab[prev][i] > 0 && random > prob[i])
-            //         {
-            //             cur = i;
-            //             break;
-            //         }
-            // }
+            else
+            {
+                prob[0] = tab[prev][0];
+                for (int i = 1; i < 12; i++)
+                    prob[i] = tab[prev][i] + prob[i-1];
 
-            MidiFileNoteStartEvent_setNote(event, 50);
+                // for (int i = 0; i < 12; i++)
+                //     printf("%f ", prob[i]);
+                // printf("\n");
 
-            // prev = cur;
+                random = (float) rand() / RAND_MAX;
+                for (int i = 0; i < 12; i++)
+                    if (random < prob[i])
+                    {
+                        printf("yo\n");
+                        cur = i;
+                        break;
+                    }
+            }
+
+            MidiFileNoteStartEvent_setNote(event, 6*12 + cur);
+            printf("%d ", 6*12 + cur);
+
+            prev = cur;
         }
 
         event = MidiFileEvent_getNextEventInFile(event);
@@ -125,24 +131,21 @@ compose(char* midifile, char* savefile)
     // for (int i = 0; i < 12; i++)
     // {
     //     for (int j = 0; j < 12; j++)
-    //         printf("%d ", tab[i][j]);
+    //         printf("%f ", tab[i][j]);
     //     printf("\n");
     // }
     // printf("N: %d\n", cpt);
 
-    /** CHANGED: On save dans le fichier de sortie. */
     MidiFile_save(md, savefile);
 }
 
 int main(int argc, char** argv)
 {
-    /** CHANGED: Y'a 3 arguments (voir usage). */
     if (argc != 3)
         usage(argv[0]);
 
     read_midi(argv[1]);
 
-    /** CHANGED: On passe le 3ème argument. */
     compose(argv[1], argv[2]);
 
     return EXIT_SUCCESS;
